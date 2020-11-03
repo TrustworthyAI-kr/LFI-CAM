@@ -60,7 +60,7 @@ parser.add_argument('--train-batch', default=128, type=int, metavar='N',
                     help='train batchsize (default: 256)')
 parser.add_argument('--test-batch', default=100, type=int, metavar='N',
                     help='test batchsize (default: 200)')
-parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.0005, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--drop', '--dropout', default=0.5, type=float,
                     metavar='Dropout', help='Dropout ratio')
@@ -336,10 +336,10 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
             inputs, targets = inputs.cuda(), targets.cuda()
 
         # compute output
-        att_outputs, outputs, _  = model(inputs)
-        att_loss = criterion(att_outputs, targets)
+        outputs, _  = model(inputs)
+        #att_loss = criterion(att_outputs, targets)
         per_loss = criterion(outputs, targets)
-        loss = att_loss +  per_loss
+        loss =  per_loss
 
         # measure accuracy and record loss
         prec1, prec3 = accuracy(outputs.data, targets.data, topk=(1, 1))
@@ -398,7 +398,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 inputs, targets = inputs.cuda(), targets.cuda()
 
             # compute output
-            _, outputs, attention = model(inputs)
+            outputs, attention = model(inputs)
             outputs = softmax(outputs)
             loss = criterion(outputs, targets)
             attention, fe, per = attention
@@ -440,6 +440,9 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 vis_map = cv2.imread('stock2.png')
 
                 # pure attention map
+                vis_map = vis_map - np.min(vis_map)
+                vis_map = vis_map/ np.max(vis_map)
+                vis_map= np.uint8(256 * vis_map)
                 jet_map = cv2.applyColorMap(vis_map, cv2.COLORMAP_JET)
 
                 # convert att map to HSV
@@ -452,7 +455,8 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 gray_heatmap = cv2.cvtColor(vis_map, cv2.COLOR_RGB2GRAY)
 
                 # NiBlack Thresholding
-                thr_gray_heatmap = cv2.ximgproc.niBlackThreshold(gray_heatmap, 255, cv2.THRESH_BINARY, 225, 0.8)
+
+                thr_gray_heatmap = cv2.ximgproc.niBlackThreshold(gray_heatmap, 255, cv2.THRESH_BINARY, 225, 0.7)
 
                 try:
                     _, contours, _ = cv2.findContours(thr_gray_heatmap,
@@ -462,13 +466,16 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                     contours, _ = cv2.findContours(thr_gray_heatmap,
                                        cv2.RETR_TREE,
                                        cv2.CHAIN_APPROX_NONE)
+
                 blend_bbox = org.copy()
                 wow = blend.copy()
+                '''
                 cv2.drawContours(wow, contours, -1, (0,255,0), 2)
                 cv2.drawContours(blend_bbox, contours, -1, (0,255,0), 2)
-                #pts= contours
-                #pts = pts.reshape((-1,1,2))
-                #cv2.polylines(blend_bbox, contours, True, (0,255,0))
+
+                pts= contours
+                pts = pts.reshape((-1,1,2))
+                cv2.polylines(blend_bbox, contours, True, (0,255,0))
 
 
                 file_name = "output/mask/myfile_"+ str(count) + ".txt"
@@ -480,7 +487,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                     file.write("--\n")
 
                 file.close()
-
+                '''
                 out_path = path.join(out_dir, 'attention', '{0:06d}.png'.format(count))
                 cv2.imwrite(out_path, vis_map)
                 out_path = path.join(out_dir, 'raw', '{0:06d}.png'.format(count))

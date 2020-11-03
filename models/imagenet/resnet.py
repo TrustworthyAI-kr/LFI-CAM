@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-
+import torch.nn.functional as F
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
@@ -110,18 +110,19 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, down_size=True)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, down_size=True)
 
-        self.att_layer4 = self._make_layer(block, 512, layers[3], stride=1, down_size=False)
-        self.bn_att = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv   = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=1, padding=0,
+
+        self.att_conv = self._make_layer(block, 512, layers[3], stride=1, down_size=False)
+        self.att_bn = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv2   = nn.Conv2d(512 * block.expansion, 1024, kernel_size=1, padding=0,
                                bias=False)
-        self.bn_att2 = nn.BatchNorm2d(num_classes)
-        self.att_conv2  = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
-                               bias=False)
-        self.att_conv3  = nn.Conv2d(num_classes, 1, kernel_size=3, padding=1,
-                               bias=False)
-        self.bn_att3 = nn.BatchNorm2d(1)
-        self.att_gap = nn.AvgPool2d(14)
-        self.sigmoid = nn.Sigmoid()
+        self.att_bn2 = nn.BatchNorm2d(1024)
+        #self.att_conv2  = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
+        #                       bias=False)
+        #self.att_conv3  = nn.Conv2d(num_classes,1, kernel_size=3, padding=1,
+        #                       bias=False)
+        #self.bn_att3 = nn.BatchNorm2d(1)
+        #self.att_gap = nn.AvgPool2d(14)
+        #self.sigmoid = nn.Sigmoid()
 
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(7, stride=1)
@@ -162,6 +163,9 @@ class ResNet(nn.Module):
 
 
     def forward(self, x):
+        # original input size (32, 3, 224, 224)
+        input = x
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -171,26 +175,89 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
 
-        fe = x
+        fe = x # feature map size (32, 1024, 14, 14)
+
+        #_, C, _, _ = fe.shape
+        # normalization
+        #act_min, _ = fe.view(1, C, -1).min(dim=2)
+        #act_min = act_min.view(1, C, 1, 1)
+        #act_max, _ = fe.view(1, C, -1).max(dim=2)
+        #act_max = act_max.view(1, C, 1, 1)
+        #denominator = torch.where(
+        #        (act_max - act_min) != 0., act_max - act_min, torch.tensor(1.).cuda())
+        #fe = fe / denominator
+
+        # resize input to (32, 1, 14, 14)
+        input_gray = torch.mean(input, dim=1, keepdim=True)
+        input_resized = F.interpolate(input_gray,(14, 14), mode='bilinear')
+
+        # new feature map
+        new_fe = input_resized * fe
+
+        # feature importance extractor w/ residual blocks
+        '''
+        self.att_conv   = nn.Conv2d(1024, 2048, kernel_size=1, padding=0,
+                               bias=False).cuda()
+        self.att_bn = nn.BatchNorm2d(2048).cuda()
+        self.att_conv1   = nn.Conv2d(2048, 1024, kernel_size=1, padding=0,
+                               bias=False).cuda()
+        self.att_bn1 = nn.BatchNorm2d(1024).cuda()
+        self.att_conv2   = nn.Conv2d(1024, 1024, kernel_size=1, padding=0,
+                               bias=False).cuda()
+        self.att_bn2 = nn.BatchNorm2d(1024).cuda()
+        '''
+
+
+        ax = self.att_conv(new_fe)
+        ax = self.att_bn(ax)
+        ax = self.att_conv2(ax)
+        ax = self.att_bn2(ax)
+
+
+        w = F.softmax(ax) # weight (1024 channel)
+
+        # weighted sum
+        att = w * fe
+
+        # attention mechansim
+        rx = att * fe
+        rx = rx + fe
+        per = rx
+
+        # classifier
+        rx = self.layer4(rx)
+        rx = self.avgpool(rx)
+        rx = rx.view(rx.size(0), -1)
+        rx = self.fc(rx)
+
+        '''
 
         ax = self.bn_att(self.att_layer4(x))
         ax = self.relu(self.bn_att2(self.att_conv(ax)))
+        #print(ax.shape)
+        px =ax
         bs, cs, ys, xs = ax.shape
         self.att = self.sigmoid(self.bn_att3(self.att_conv3(ax)))
+        #print("att",self.att.shape)
         #self.att = self.att.view(bs, 1, ys, xs)
         ax = self.att_conv2(ax)
         ax = self.att_gap(ax)
         ax = ax.view(ax.size(0), -1)
 
-        rx = x * self.att
+        #print(x.shape)
+        rx = fe * self.att
+        #print(self.att.shape)
+        #rx = x * self.att
+        #print("rx", rx.shape)
         rx = rx + x
         per = rx
         rx = self.layer4(rx)
         rx = self.avgpool(rx)
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
+        '''
 
-        return ax, rx, [self.att, fe, per]
+        return rx, [att, fe, per]
 
 def resnet18(pretrained=False, **kwargs):
     """Constructs a ResNet-18 model.
