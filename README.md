@@ -5,6 +5,14 @@ Writer : [Hiroshi Fukui](https://github.com/Hiroshi-Fukui)
 Maintainer : [Tsubasa Hirakawa](https://github.com/thirakawa)
 
 # Quick Runs
+
+## Using CIFAR-10 or CIFAR-100
+- Training & Evaluating from Scratch
+```
+python cifar.py -a resnet --dataset cifar10 --depth 110 --epochs 300 --schedule 150 225 --gamma 0.1 --wd 1e-4 --checkpoint checkpoints/cifar10/resnet-110-mod --gpu-id 0,1,2,3
+```
+
+## Using ImageNet or custom dataset
 - Training & Evaluating from Scratch
 ```
 python abn.py -a resnet50 --data ./data/neu_split --epochs 300 --checkpoint checkpoints/neu/res50_mix --gpu-id 0,1,2
