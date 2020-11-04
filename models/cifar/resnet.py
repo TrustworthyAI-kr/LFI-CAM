@@ -7,6 +7,7 @@ and
 https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 (c) YANG, Wei
 '''
+import torch.nn.functional as F
 import torch
 import torch.nn as nn
 import math
@@ -109,18 +110,26 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 16, n, down_size=True)
         self.layer2 = self._make_layer(block, 32, n, stride=2, down_size=True)
 
-        self.att_layer3 = self._make_layer(block, 64, n, stride=1, down_size=False)
-        self.bn_att = nn.BatchNorm2d(64 * block.expansion)
-        self.att_conv   = nn.Conv2d(64 * block.expansion, num_classes, kernel_size=1, padding=0,
-                               bias=False)
-        self.bn_att2 = nn.BatchNorm2d(num_classes)
-        self.att_conv2  = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
-                               bias=False)
-        self.att_conv3  = nn.Conv2d(num_classes, 1, kernel_size=3, padding=1,
-                               bias=False)
-        self.bn_att3 = nn.BatchNorm2d(1)
-        self.att_gap = nn.AvgPool2d(16)
-        self.sigmoid = nn.Sigmoid()
+        self.att_conv = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.att_bn = nn.BatchNorm2d(32 * block.expansion)
+        self.att_conv2 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.att_bn2 = nn.BatchNorm2d(32 * block.expansion)
+        self.att_conv3 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.att_bn3 = nn.BatchNorm2d(32 * block.expansion)
+        self.att_conv4 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.att_bn4 = nn.BatchNorm2d(32 * block.expansion)
+        self.att_conv5 = self._make_layer(block, 32, n, stride=1, down_size=True)
+        self.att_bn5 = nn.BatchNorm2d(32 * block.expansion)
+        #self.att_conv6 = nn.Conv2d(64 * block.expansion, 128, kernel_size=1, padding=0,
+        #                       bias=False)
+        #self.att_bn6 = nn.BatchNorm2d(128)
+        #self.att_conv2  = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
+        #                       bias=False)
+        #self.att_conv3  = nn.Conv2d(num_classes, 1, kernel_size=3, padding=1,
+        #                       bias=False)
+        #self.bn_att3 = nn.BatchNorm2d(1)
+        #self.att_gap = nn.AvgPool2d(16)
+        #self.sigmoid = nn.Sigmoid()
 
         self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(8)
@@ -161,11 +170,12 @@ class ResNet(nn.Module):
             inplanes = planes * block.expansion
             for i in range(1, blocks):
                 layers.append(block(inplanes, planes))
-
+            ##print(nn.Sequential(*layers))
             return nn.Sequential(*layers)
 
 
     def forward(self, x):
+        input =x
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)    # 32x32
@@ -173,6 +183,42 @@ class ResNet(nn.Module):
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16
 
+        fe=x # feature map
+
+        input_gray = torch.mean(input, dim=1, keepdim=True)
+        input_resized = F.interpolate(input_gray,(16, 16), mode='bilinear')
+
+        # new feature map
+        new_fe = input_resized * fe
+
+        ax = self.att_conv(new_fe)
+        ax = self.att_bn(ax)
+        ax = self.att_conv2(ax)
+        ax = self.att_bn2(ax)
+        ax = self.att_conv3(ax)
+        ax = self.att_bn3(ax)
+        ax = self.att_conv4(ax)
+        ax = self.att_bn4(ax)
+        ax = self.att_conv5(ax)
+        ax = self.att_bn5(ax)
+
+        w = F.softmax(ax)
+
+        # weighted sum
+        att = w * fe
+
+        # attention mechansim
+        rx = att * fe
+        rx = rx + fe
+        per = rx
+
+        # classifier
+        rx = self.layer3(rx)
+        rx = self.avgpool(rx)
+        rx = rx.view(rx.size(0), -1)
+        rx = self.fc(rx)
+
+        '''
         ax = self.bn_att(self.att_layer3(x))
         ax = self.relu(self.bn_att2(self.att_conv(ax)))
         bs, cs, ys, xs = ax.shape
@@ -188,8 +234,8 @@ class ResNet(nn.Module):
         rx = self.avgpool(rx)
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
-
-        return ax, rx, self.att
+        '''
+        return rx, att
 
 
 def resnet(**kwargs):
@@ -197,5 +243,3 @@ def resnet(**kwargs):
     Constructs a ResNet model.
     """
     return ResNet(**kwargs)
-
-

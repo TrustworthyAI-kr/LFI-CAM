@@ -25,6 +25,8 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import models.cifar as models
+from torch.optim import lr_scheduler
+
 from os import path
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 
@@ -51,13 +53,14 @@ parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--drop', '--dropout', default=0, type=float,
                     metavar='Dropout', help='Dropout ratio')
-parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
-                        help='Decrease learning rate at these epochs.')
+#parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
+#                        help='Decrease learning rate at these epochs.')
 parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--lr_patience', type=float, default=10)
 # Checkpoints
 parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
                     help='path to save checkpoint (default: checkpoint)')
@@ -186,6 +189,7 @@ def main():
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    lr_sch=  lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience= args.lr_patience)
 
     # Resume
     title = 'cifar-10-' + args.arch
@@ -211,9 +215,10 @@ def main():
         print(' Test Loss:  %.8f, Test Acc:  %.2f' % (test_loss, test_acc))
         return
 
+    best_epoch =0
     # Train and val
     for epoch in range(start_epoch, args.epochs):
-        adjust_learning_rate(optimizer, epoch)
+        #adjust_learning_rate(optimizer, epoch)
 
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
 
@@ -225,6 +230,10 @@ def main():
 
         # save model
         is_best = test_acc > best_acc
+
+        if is_best:
+            best_epoch = epoch
+
         best_acc = max(test_acc, best_acc)
         save_checkpoint({
                 'epoch': epoch + 1,
@@ -233,13 +242,14 @@ def main():
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint=args.checkpoint)
+        lr_sch.step(test_loss)
 
     logger.close()
     logger.plot()
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
-    print('Best acc:')
-    print(best_acc)
+    print('Best acc:', best_acc)
+    print('Best epoch:', best_epoch)
 
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode
@@ -262,10 +272,8 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
         #inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output
-        att_outputs, outputs,  _ = model(inputs)
-        att_loss = criterion(att_outputs, targets)
-        per_loss = criterion(outputs, targets)
-        loss = att_loss+ per_loss
+        outputs,  _ = model(inputs)
+        loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
@@ -324,7 +332,7 @@ def test(testloader, model, criterion, epoch, use_cuda):
             #inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
 
             # compute output
-            _, outputs, attention = model(inputs)
+            outputs, attention = model(inputs)
             loss = criterion(outputs, targets)
             #attention, fe, per = attention
 
@@ -443,12 +451,14 @@ def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoin
         shutil.copytree("output/", os.path.join(checkpoint, 'output'))
         shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
+'''
 def adjust_learning_rate(optimizer, epoch):
     global state
     if epoch in args.schedule:
         state['lr'] *= args.gamma
         for param_group in optimizer.param_groups:
             param_group['lr'] = state['lr']
+'''
 
 if __name__ == '__main__':
     main()
