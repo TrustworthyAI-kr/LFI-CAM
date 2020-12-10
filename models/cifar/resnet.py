@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 import math
-
+import numpy as np
 
 __all__ = ['resnet']
 
@@ -112,34 +112,15 @@ class ResNet(nn.Module):
 
         self.att_conv = self._make_layer(block, 32, n, stride=1, down_size=False)
         self.att_bn = nn.BatchNorm2d(32 * block.expansion)
-        self.att_conv2 = self._make_layer(block, 32, n, stride=1, down_size=False)
-        self.att_bn2 = nn.BatchNorm2d(32 * block.expansion)
-        self.att_conv3 = self._make_layer(block, 32, n, stride=1, down_size=False)
-        self.att_bn3 = nn.BatchNorm2d(32 * block.expansion)
-        self.att_conv4 = self._make_layer(block, 32, n, stride=1, down_size=False)
-        self.att_bn4 = nn.BatchNorm2d(32 * block.expansion)
-        self.att_conv5 = self._make_layer(block, 32, n, stride=1, down_size=True)
-        self.att_bn5 = nn.BatchNorm2d(32 * block.expansion)
-        #self.att_conv6 = nn.Conv2d(64 * block.expansion, 128, kernel_size=1, padding=0,
-        #                       bias=False)
-        #self.att_bn6 = nn.BatchNorm2d(128)
-        #self.att_conv2  = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
-        #                       bias=False)
-        #self.att_conv3  = nn.Conv2d(num_classes, 1, kernel_size=3, padding=1,
-        #                       bias=False)
-        #self.bn_att3 = nn.BatchNorm2d(1)
-        #self.att_gap = nn.AvgPool2d(16)
+
         #self.sigmoid = nn.Sigmoid()
+        #self.softmax = nn.Softmax()
 
         self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(8)
         self.fc = nn.Linear(64 * block.expansion, num_classes)
-
-        # print(block, n)
-        # self.att_layer3 = self._make_layer(block, 64, n, stride=1)
-        # self.att_conv   = nn.Conv2d(64, num_classes, kernel_size=3, padding=1,
-        #                        bias=False)
-        # self.att_gap = nn.AvgPool2d(16)
+        #print(64* block.expansion)
+        #self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -181,7 +162,7 @@ class ResNet(nn.Module):
         x = self.relu(x)    # 32x32
 
         x = self.layer1(x)  # 32x32
-        x = self.layer2(x)  # 16x16
+        x = self.layer2(x)  # 16x16 (cifar)
 
         fe=x # feature map
 
@@ -193,19 +174,14 @@ class ResNet(nn.Module):
 
         ax = self.att_conv(new_fe)
         ax = self.att_bn(ax)
-        ax = self.att_conv2(ax)
-        ax = self.att_bn2(ax)
-        ax = self.att_conv3(ax)
-        ax = self.att_bn3(ax)
-        ax = self.att_conv4(ax)
-        ax = self.att_bn4(ax)
-        ax = self.att_conv5(ax)
-        ax = self.att_bn5(ax)
 
+        # weight
         w = F.softmax(ax)
 
         # weighted sum
         att = w * fe
+        att -= att.min(1, keepdim=True)[0]
+        att /= att.max(1, keepdim=True)[0]
 
         # attention mechansim
         rx = att * fe
@@ -218,24 +194,7 @@ class ResNet(nn.Module):
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
 
-        '''
-        ax = self.bn_att(self.att_layer3(x))
-        ax = self.relu(self.bn_att2(self.att_conv(ax)))
-        bs, cs, ys, xs = ax.shape
-        self.att = self.sigmoid(self.bn_att3(self.att_conv3(ax)))
-        # self.att = self.att.view(bs, 1, ys, xs)
-        ax = self.att_conv2(ax)
-        ax = self.att_gap(ax)
-        ax = ax.view(ax.size(0), -1)
-
-        rx = x * self.att
-        rx = rx + x
-        rx = self.layer3(rx)  # 8x8
-        rx = self.avgpool(rx)
-        rx = rx.view(rx.size(0), -1)
-        rx = self.fc(rx)
-        '''
-        return rx, att
+        return rx, att, w
 
 
 def resnet(**kwargs):

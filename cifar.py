@@ -45,22 +45,22 @@ parser.add_argument('--epochs', default=300, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('--train-batch', default=256, type=int, metavar='N',
+parser.add_argument('--train-batch', default=128, type=int, metavar='N',
                     help='train batchsize')
-parser.add_argument('--test-batch', default=200, type=int, metavar='N',
+parser.add_argument('--test-batch', default=100, type=int, metavar='N',
                     help='test batchsize')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--drop', '--dropout', default=0, type=float,
                     metavar='Dropout', help='Dropout ratio')
-#parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
-#                        help='Decrease learning rate at these epochs.')
+parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
+                        help='Decrease learning rate at these epochs.')
 parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=5e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)')
-parser.add_argument('--lr_patience', type=float, default=10)
+                    metavar='W', help='weight decay (default: 5e-4)')
+
 # Checkpoints
 parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
                     help='path to save checkpoint (default: checkpoint)')
@@ -77,6 +77,7 @@ parser.add_argument('--cardinality', type=int, default=8, help='Model cardinalit
 parser.add_argument('--widen-factor', type=int, default=4, help='Widen factor. 4 -> 64, 8 -> 128, ...')
 parser.add_argument('--growthRate', type=int, default=12, help='Growth rate for DenseNet.')
 parser.add_argument('--compressionRate', type=int, default=2, help='Compression Rate (theta) for DenseNet.')
+
 # Miscs
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
@@ -128,14 +129,20 @@ def main():
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
+        #transforms.ColorJitter(5,5,5),
+        #transforms.RandomAffine(10),
+        #transforms.RandomPerspective(),
+        #transforms.RandomRotation(10),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        #transforms.RandomErasing(),
     ])
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
+
     if args.dataset == 'cifar10':
         dataloader = datasets.CIFAR10
         num_classes = 10
@@ -187,9 +194,9 @@ def main():
     cudnn.benchmark = True
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters())/1000000.0))
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().cuda()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-    lr_sch=  lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience= args.lr_patience)
+
 
     # Resume
     title = 'cifar-10-' + args.arch
@@ -218,7 +225,7 @@ def main():
     best_epoch =0
     # Train and val
     for epoch in range(start_epoch, args.epochs):
-        #adjust_learning_rate(optimizer, epoch)
+        adjust_learning_rate(optimizer, epoch)
 
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
 
@@ -242,7 +249,10 @@ def main():
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint=args.checkpoint)
-        lr_sch.step(test_loss)
+
+        print('Best acc:', best_acc)
+        print('Best epoch:', best_epoch)
+
 
     logger.close()
     logger.plot()
@@ -269,11 +279,14 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
 
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
-        #inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
 
         # compute output
-        outputs,  _ = model(inputs)
+        outputs,  _ , w= model(inputs)
         loss = criterion(outputs, targets)
+
+        # l2 regularization for softmax weight
+        l2_reg = torch.norm(w)
+        loss = loss  + 0.000005 * l2_reg
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
@@ -329,13 +342,11 @@ def test(testloader, model, criterion, epoch, use_cuda):
 
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda()
-            #inputs, targets = torch.autograd.Variable(inputs, volatile=True), torch.autograd.Variable(targets)
 
             # compute output
-            outputs, attention = model(inputs)
+            outputs, attention, w = model(inputs)
             loss = criterion(outputs, targets)
-            #attention, fe, per = attention
-
+ 
             c_att = attention.data.cpu()
             c_att = c_att.numpy()
             d_inputs = inputs.data.cpu()
@@ -363,29 +374,23 @@ def test(testloader, model, criterion, epoch, use_cuda):
 
                 v_img = ((item_img.transpose((1,2,0)) + 0.5 + [0.4914, 0.4822, 0.4465]) * [0.2023, 0.1994, 0.2010])* 256
                 v_img = v_img[:, :, ::-1]
+
                 resize_att = cv2.resize(item_att[0], (in_x, in_y))
                 resize_att *= 255.
-                org = v_img
 
                 cv2.imwrite('stock1.png', v_img)
                 cv2.imwrite('stock2.png', resize_att)
                 v_img = cv2.imread('stock1.png')
                 vis_map = cv2.imread('stock2.png')
+                org= v_img
 
-                # pure attention map
                 vis_map = vis_map - np.min(vis_map)
                 vis_map = vis_map/ np.max(vis_map)
                 vis_map= np.uint8(256 * vis_map)
                 jet_map = cv2.applyColorMap(vis_map, cv2.COLORMAP_JET)
 
-                # convert att map to HSV
-                #heatmap_BGR = cv2.cvtColor(jet_map, cv2.COLOR_RGB2BGR)
-                #hsv_heatmap = cv2.cvtColor(heatmap_BGR, cv2.COLOR_BGR2HSV)
-
                 # create blended img (original + heatmap)
                 blend = org * 0.6 + jet_map * 0.4
-                blend_bbox = org.copy()
-                wow = blend.copy()
 
                 out_path = path.join(out_dir, 'attention', '{0:06d}.png'.format(count))
                 cv2.imwrite(out_path, vis_map)
@@ -393,22 +398,11 @@ def test(testloader, model, criterion, epoch, use_cuda):
                 cv2.imwrite(out_path, v_img)
 
                 out_path = path.join(out_dir, 'concat', '{0:06d}_concat.png'.format(count))
-               # adl = cv2.imread("../ADL_WSOL/Pytorch/log_archive/0.8_epoch300/results/"+str(epoch)+"/HEAT_TEST"+str(epoch+1)+"_"+ str(count)+"_blend.jpg")
-                c1 =  np.concatenate((cv2.resize(v_img,(224,224)), cv2.resize(wow, (224,224))), axis=1)
-                #
-                #c2 =  np.concatenate((c1, blend_bbox), axis=1)
-                #c3 = np.concatenate((c2, adl), axis=1)
+                c1 =  np.concatenate((cv2.resize(v_img,(224,224)), cv2.resize(blend, (224,224))), axis=1)
                 cv2.imwrite(out_path, c1)
 
                 count += 1
 
-            #print(attention.min(), attention.max())
-            """
-            np_inputs = inputs.numpy()
-            np_att = attention.numpy()
-            for item_in, item_att in zip(np_inputs, np_att):
-                print(item_in.shape, item_att.shape)
-            """
 
             # measure accuracy and record loss
             prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
@@ -445,20 +439,18 @@ def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoin
     torch.save(state, filepath)
     if is_best:
         print("\nModel saved...")
-        if not path.exists(path.join(args.checkpoint, 'output')):
-            os.mkdir(path.join(args.checkpoint, 'output'))
         shutil.rmtree(os.path.join(args.checkpoint, 'output'))
         shutil.copytree("output/", os.path.join(checkpoint, 'output'))
         shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
-'''
+
 def adjust_learning_rate(optimizer, epoch):
     global state
     if epoch in args.schedule:
         state['lr'] *= args.gamma
         for param_group in optimizer.param_groups:
             param_group['lr'] = state['lr']
-'''
+
 
 if __name__ == '__main__':
     main()
