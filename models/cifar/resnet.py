@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import math
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 __all__ = ['resnet']
 
@@ -110,16 +111,27 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 16, n, down_size=True)
         self.layer2 = self._make_layer(block, 32, n, stride=2, down_size=True)
 
-        self.att_conv = self._make_layer(block, 32, n, stride=1, down_size=False)
-        self.att_bn = nn.BatchNorm2d(32 * block.expansion)
+        self.att_conv = self._make_layer(block, 64, n, stride=1, down_size=False)
+        self.att_bn = nn.BatchNorm2d(64 * block.expansion)
+        self.att_conv1  = nn.Conv2d(64 * block.expansion, 32*block.expansion, kernel_size=3, padding=1, bias= False)
+        self.att_bn1 = nn.BatchNorm2d(32* block.expansion)
+        self.att_conv3  = nn.Conv2d(32* block.expansion,1, kernel_size=3, padding=1, bias= False)
+        self.att_bn3 = nn.BatchNorm2d(1)
+        #self.att_conv4  = nn.Conv2d(32*block.expansion,num_classes, kernel_size=1, padding=0, bias= False)
+        #self.att_bn4 = nn.BatchNorm2d(num_classes)
 
-        #self.sigmoid = nn.Sigmoid()
+        #self.att_conv1 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        #self.att_bn1 = nn.BatchNorm2d(32 * block.expansion)
+        #self.att_conv2 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        #self.att_bn2 = nn.BatchNorm2d(32 * block.expansion)
+
+
+        self.sigmoid = nn.Sigmoid()
         #self.softmax = nn.Softmax()
 
         self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(8)
         self.fc = nn.Linear(64 * block.expansion, num_classes)
-        #print(64* block.expansion)
         #self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
 
         for m in self.modules():
@@ -164,7 +176,8 @@ class ResNet(nn.Module):
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16 (cifar)
 
-        fe=x # feature map
+        fe=x # feature map (c: 32)
+        #fe_prime=self.att_conv4(fe)
 
         input_gray = torch.mean(input, dim=1, keepdim=True)
         input_resized = F.interpolate(input_gray,(16, 16), mode='bilinear')
@@ -174,19 +187,43 @@ class ResNet(nn.Module):
 
         ax = self.att_conv(new_fe)
         ax = self.att_bn(ax)
+        ax = self.att_conv1(ax)
+        ax = self.att_bn1(ax)
+        #print(ax.shape)
+        #bx = self.att_conv2(ax)
+        #bx = self.att_bn2(bx)
+        bx = self.sigmoid(ax)
+        #cx = self.att_conv3(bx)
+        #cx = self.att_bn3(cx)
+        #print(bx.shape)
 
-        # weight
-        w = F.softmax(ax)
 
+        # weight (c: 1)
+        w = F.softmax(bx)
+        #print(w)
+        #print(ax)
         # weighted sum
-        att = w * fe
-        att -= att.min(1, keepdim=True)[0]
-        att /= att.max(1, keepdim=True)[0]
+        att =  fe * w
+        #print(att.shape)
+        att = self.att_conv3(att)
+        att = self.att_bn3(att)
+        #att = unnormed_att.view(unnormed_att.size(0), -1)
+        #print(att==fe) 
+        #print(att)
+        att_min = att.min(dim=3, keepdim=True)[0].min(2, keepdim=True)[0]
+        att_max = att.max(dim=3, keepdim=True)[0].max(2, keepdim=True)[0]
+        #
+        att = (att - att_min)/ ((att_max - att_min)+ 1e-12)
 
+
+        #att = att - att.min(1, keepdim=True)[0]
+        #att = att /att.max(1, keepdim=True)[0]
+        #att = att.view(unnormed_att.size(0), unnormed_att.size(1), 16, 16)
         # attention mechansim
         rx = att * fe
         rx = rx + fe
         per = rx
+        #print(rx.shape)
 
         # classifier
         rx = self.layer3(rx)

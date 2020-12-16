@@ -285,8 +285,8 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
         loss = criterion(outputs, targets)
 
         # l2 regularization for softmax weight
-        l2_reg = torch.norm(w)
-        loss = loss  + 0.000005 * l2_reg
+        #l2_reg = torch.norm(w)
+        #loss = loss  + 0.000005 * l2_reg
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
