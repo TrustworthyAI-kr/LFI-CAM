@@ -115,19 +115,8 @@ class ResNet(nn.Module):
         self.att_bn = nn.BatchNorm2d(64 * block.expansion)
         self.att_conv1  = nn.Conv2d(64 * block.expansion, 32*block.expansion, kernel_size=3, padding=1, bias= False)
         self.att_bn1 = nn.BatchNorm2d(32* block.expansion)
-        self.att_conv3  = nn.Conv2d(32* block.expansion,1, kernel_size=3, padding=1, bias= False)
-        self.att_bn3 = nn.BatchNorm2d(1)
-        #self.att_conv4  = nn.Conv2d(32*block.expansion,num_classes, kernel_size=1, padding=0, bias= False)
-        #self.att_bn4 = nn.BatchNorm2d(num_classes)
 
-        #self.att_conv1 = self._make_layer(block, 32, n, stride=1, down_size=False)
-        #self.att_bn1 = nn.BatchNorm2d(32 * block.expansion)
-        #self.att_conv2 = self._make_layer(block, 32, n, stride=1, down_size=False)
-        #self.att_bn2 = nn.BatchNorm2d(32 * block.expansion)
-
-
-        self.sigmoid = nn.Sigmoid()
-        #self.softmax = nn.Softmax()
+        self.avgpool2 = nn.AvgPool2d(16)
 
         self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(8)
@@ -176,8 +165,8 @@ class ResNet(nn.Module):
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16 (cifar)
 
-        fe=x # feature map (c: 32)
-        #fe_prime=self.att_conv4(fe)
+        fe=x # feature map
+
 
         input_gray = torch.mean(input, dim=1, keepdim=True)
         input_resized = F.interpolate(input_gray,(16, 16), mode='bilinear')
@@ -189,41 +178,38 @@ class ResNet(nn.Module):
         ax = self.att_bn(ax)
         ax = self.att_conv1(ax)
         ax = self.att_bn1(ax)
-        #print(ax.shape)
-        #bx = self.att_conv2(ax)
-        #bx = self.att_bn2(bx)
-        bx = self.sigmoid(ax)
-        #cx = self.att_conv3(bx)
-        #cx = self.att_bn3(cx)
-        #print(bx.shape)
 
-
-        # weight (c: 1)
+        ax = self.avgpool2(ax)
+        bx = ax.view(ax.size(0), -1)
         w = F.softmax(bx)
-        #print(w)
-        #print(ax)
-        # weighted sum
-        att =  fe * w
-        #print(att.shape)
-        att = self.att_conv3(att)
-        att = self.att_bn3(att)
-        #att = unnormed_att.view(unnormed_att.size(0), -1)
-        #print(att==fe) 
-        #print(att)
-        att_min = att.min(dim=3, keepdim=True)[0].min(2, keepdim=True)[0]
-        att_max = att.max(dim=3, keepdim=True)[0].max(2, keepdim=True)[0]
-        #
-        att = (att - att_min)/ ((att_max - att_min)+ 1e-12)
 
+        b, c, u, v = fe.size()
 
-        #att = att - att.min(1, keepdim=True)[0]
-        #att = att /att.max(1, keepdim=True)[0]
-        #att = att.view(unnormed_att.size(0), unnormed_att.size(1), 16, 16)
+        score_saliency_map= torch.zeros((b,1,u,v)).cuda()
+
+        for i in range(c):
+            saliency_map = torch.unsqueeze(fe[:, i,:,:],1)
+
+            if saliency_map.max() == saliency_map.min():
+                continue
+
+            # norm
+            norm_saliency_map = (saliency_map - saliency_map.min()) / (saliency_map.max() - saliency_map.min()) 
+            score = torch.unsqueeze(torch.unsqueeze(torch.unsqueeze(w[:,i],1),1),1)
+            score_saliency_map += score*norm_saliency_map
+
+        score_saliency_map_min, score_saliency_map_max = score_saliency_map.min(), score_saliency_map.max()
+
+        if score_saliency_map_min == score_saliency_map_max:
+            return None
+
+        score_saliency_map = (score_saliency_map - score_saliency_map_min).div(score_saliency_map_max - score_saliency_map_min).data
+
+        att= score_saliency_map
+
         # attention mechansim
         rx = att * fe
         rx = rx + fe
-        per = rx
-        #print(rx.shape)
 
         # classifier
         rx = self.layer3(rx)
