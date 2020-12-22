@@ -277,7 +277,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
 
         # compute output
         outputs,  _ , w= model(inputs)
-        loss = criterion(outputs, targets)*1.5
+        loss = criterion(outputs, targets)
 
         # l2 regularization for softmax weight
         #l2_reg = torch.norm(w)
