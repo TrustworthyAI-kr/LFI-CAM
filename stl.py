@@ -132,7 +132,7 @@ def main():
         #transforms.ColorJitter(2,2,2),
         #transforms.RandomAffine(10),
         #transforms.RandomPerspective(),
-        transforms.RandomRotation(10),
+        #transforms.RandomRotation(10),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2471, 0.2435, 0.2616)),
         #transforms.RandomErasing(),
@@ -277,11 +277,11 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
 
         # compute output
         outputs,  _ , w= model(inputs)
-        loss = criterion(outputs, targets)
+        loss = criterion(outputs, targets)*1.5
 
         # l2 regularization for softmax weight
-        l2_reg = torch.norm(w)
-        loss = loss  + 0.000005 * l2_reg
+        #l2_reg = torch.norm(w)
+        #loss = loss  + 0.000005 * l2_reg
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
@@ -342,6 +342,8 @@ def test(testloader, model, criterion, epoch, use_cuda):
             outputs, attention, w = model(inputs)
             loss = criterion(outputs, targets)
 
+            #print(w)
+
             c_att = attention.data.cpu()
             c_att = c_att.numpy()
             d_inputs = inputs.data.cpu()
@@ -351,7 +353,7 @@ def test(testloader, model, criterion, epoch, use_cuda):
             for item_img, item_att in zip(d_inputs, c_att):
 
                 ## img directories
-                out_dir = path.join('output')
+                out_dir = path.join('output2')
                 if not path.exists(out_dir):
                     os.mkdir(out_dir)
 
@@ -373,10 +375,10 @@ def test(testloader, model, criterion, epoch, use_cuda):
                 resize_att = cv2.resize(item_att[0], (in_x, in_y))
                 resize_att *= 255.
 
-                cv2.imwrite('stock1.png', v_img)
-                cv2.imwrite('stock2.png', resize_att)
-                v_img = cv2.imread('stock1.png')
-                vis_map = cv2.imread('stock2.png')
+                cv2.imwrite('2stock1.png', v_img)
+                cv2.imwrite('2stock2.png', resize_att)
+                v_img = cv2.imread('2stock1.png')
+                vis_map = cv2.imread('2stock2.png')
                 org= v_img
 
                 vis_map = vis_map - np.min(vis_map)
@@ -435,7 +437,7 @@ def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoin
     if is_best:
         print("\nModel saved...")
         shutil.rmtree(os.path.join(args.checkpoint, 'output'))
-        shutil.copytree("output/", os.path.join(checkpoint, 'output'))
+        shutil.copytree("output2/", os.path.join(checkpoint, 'output'))
         shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
 
