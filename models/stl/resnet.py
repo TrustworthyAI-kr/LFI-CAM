@@ -112,33 +112,20 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 16, n, down_size=True)
         self.layer2 = self._make_layer(block, 32, n, stride=2, down_size=True)
 
-        self.att_conv1 = self._make_layer(block, 64, n, stride=1, down_size=True)
-        self.att_bn1 = nn.BatchNorm2d(64* block.expansion)
-        ''' 
-        self.att_conv2 = nn.Conv2d(64 * block.expansion, 128*block.expansion, kernel_size=1, padding=0, bias= False)
-        self.att_bn2 = nn.BatchNorm2d(128* block.expansion)
-        self.att_conv3  = nn.Conv2d(128 * block.expansion, 64 * block.expansion, kernel_size=1, padding=0, bias= False)
-        self.att_bn3 = nn.BatchNorm2d(64 * block.expansion)
-        self.att_conv4  = nn.Conv2d(64 * block.expansion, 32 * block.expansion, kernel_size=3, padding=1, bias= False)
-        self.att_bn4 = nn.BatchNorm2d(32 * block.expansion)
-        '''
+        self.block1 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.block2 = self._make_layer(block, 64, n, stride=1, down_size=True)
+        self.block3 = self._make_layer(block, 64, n, stride=1, down_size=False)
 
+        self.att_conv1 = self._make_layer(block, 64, n, stride=1, down_size=False)
+        self.att_bn1 = nn.BatchNorm2d(64* block.expansion)
         self.att_conv2 = self._make_layer(block, 128, n, stride=1, down_size=True)
         self.att_bn2 = nn.BatchNorm2d(128* block.expansion)
-        self.att_conv3 = self._make_layer(block, 64, n, stride=1, down_size=True)
-        self.att_bn3 = nn.BatchNorm2d(64* block.expansion)
-        self.att_conv4 = self._make_layer(block, 32, n, stride=1, down_size=True)
-        self.att_bn4 = nn.BatchNorm2d(32* block.expansion)
-        self.att_conv5  = nn.Conv2d(32* block.expansion, 32*block.expansion, kernel_size=3, padding=1, bias= False)
-        self.att_bn5 = nn.BatchNorm2d(32* block.expansion)
+        self.att_conv3 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.att_bn3 = nn.BatchNorm2d(32* block.expansion)
 
-        self.avgpool2 = nn.AvgPool2d(4)
-        self.hidden1 = nn.Linear(512, 128)
-        self.hidden2 = nn.Linear(128, 32)
-
-        self.layer3 = self._make_layer(block, 32, n, stride=2, down_size=True)
+        #self.layer3 = self._make_layer(block, 32, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(8)
-        self.fc = nn.Linear(32 * block.expansion, num_classes)
+        self.fc = nn.Linear(256 * block.expansion, num_classes)
         #self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
 
         for m in self.modules():
@@ -176,6 +163,8 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         input =x
+
+        # feature extractor
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)    # 32x32
@@ -183,29 +172,33 @@ class ResNet(nn.Module):
 
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16 (cifar)
-        fe=x # feature map
 
+        # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
         input_resized = F.interpolate(input_gray,(16, 16), mode='bilinear')
 
-        # new feature map
-        new_fe = input_resized * fe 
+        # block 1
+        ax = self.block1(x)
+        ex =ax
 
+        # block 2, 3
+        ax = self.block2(ax)
+        ax = self.block3(ax)
+
+        fe = ax
+        new_fe = fe * input_resized
+
+        # feature importance extractor
         ax = self.att_conv1(new_fe)
         ax = self.att_bn1(ax)
         ax = self.att_conv2(ax)
         ax = self.att_bn2(ax)
         ax = self.att_conv3(ax)
         ax = self.att_bn3(ax)
-        ax = self.att_conv4(ax)
-        ax = self.att_bn4(ax)
-        ax = self.att_bn5(ax)
-        ax = self.att_conv5(ax)
 
-        ax = self.avgpool2(ax)
+        ax = self.avgpool(ax)
         bx = ax.view(ax.size(0), -1)
-        #print(bx.size()) 
-        bx = self.hidden2(self.relu(self.hidden1(bx)))
+
         w = F.softmax(bx)
 
         b, c, u, v = fe.size()
@@ -235,11 +228,12 @@ class ResNet(nn.Module):
         att= score_saliency_map
 
         # attention mechansim
-        rx = att * fe
-        rx = rx + fe
+        rx = att * ex
+        rx = rx + ex
 
         # classifier
-        rx = self.layer3(rx)
+        rx = self.block2(rx)
+        rx = self.block3(rx)
         rx = self.avgpool(rx)
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
@@ -252,3 +246,5 @@ def resnet(**kwargs):
     Constructs a ResNet model.
     """
     return ResNet(**kwargs)
+
+
