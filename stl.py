@@ -14,8 +14,6 @@ import numpy as np
 import pickle
 from torch.autograd import Variable
 
-
-
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -25,7 +23,6 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import models.stl as models
-from torch.optim import lr_scheduler
 
 from os import path
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
@@ -94,7 +91,6 @@ assert args.dataset == 'stl10', 'Dataset can only be stl10.'
 # Use CUDA
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
 use_cuda = torch.cuda.is_available()
-
 
 
 # Random seed
@@ -195,7 +191,7 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     # Resume
-    title = 'cifar-10-' + args.arch
+    title = 'STL-10 ' + args.arch
     if args.resume:
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
@@ -276,12 +272,8 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
             inputs, targets = inputs.cuda(), targets.cuda()
 
         # compute output
-        outputs,  _ , w= model(inputs)
+        outputs,  _ , _ = model(inputs)
         loss = criterion(outputs, targets)
-
-        # l2 regularization for softmax weight
-        #l2_reg = torch.norm(w)
-        #loss = loss  + 0.000005 * l2_reg
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(outputs.data, targets.data, topk=(1, 5))
