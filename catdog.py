@@ -193,6 +193,7 @@ def main():
         assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
         args.checkpoint = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
+        best_epoch = checkpoint['best_epoch']
         best_acc = checkpoint['best_acc']
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
@@ -239,6 +240,7 @@ def main():
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
                 'acc': test_acc,
+                'best_epoch': best_epoch + 1,
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint=args.checkpoint)
