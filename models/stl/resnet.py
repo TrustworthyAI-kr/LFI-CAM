@@ -120,11 +120,12 @@ class ResNet(nn.Module):
         self.att_bn1 = nn.BatchNorm2d(64* block.expansion)
         self.att_conv2 = self._make_layer(block, 128, n, stride=1, down_size=True)
         self.att_bn2 = nn.BatchNorm2d(128* block.expansion)
-        self.att_conv3 = self._make_layer(block, 32, n, stride=1, down_size=False)
-        self.att_bn3 = nn.BatchNorm2d(32* block.expansion)
+        self.att_conv3 = self._make_layer(block, 16, n, stride=1, down_size=False)
+        self.att_bn3 = nn.BatchNorm2d(16* block.expansion)
 
         #self.layer3 = self._make_layer(block, 32, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(8)
+        self.avgpool2 = nn.AvgPool2d(8)
         self.fc = nn.Linear(256 * block.expansion, num_classes)
         #self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
 
@@ -198,11 +199,9 @@ class ResNet(nn.Module):
 
         ax = self.avgpool(ax)
         bx = ax.view(ax.size(0), -1)
-
         w = F.softmax(bx)
 
         b, c, u, v = fe.size()
-
         score_saliency_map= torch.zeros((b,1,u,v)).cuda()
 
         for i in range(c):
@@ -234,7 +233,7 @@ class ResNet(nn.Module):
         # classifier
         rx = self.block2(rx)
         rx = self.block3(rx)
-        rx = self.avgpool(rx)
+        rx = self.avgpool2(rx)
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
 
