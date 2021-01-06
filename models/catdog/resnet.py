@@ -113,18 +113,18 @@ class ResNet(nn.Module):
 
         self.block1 = self._make_layer(block, 256, layers[3], down_size=False)
         self.block2 = self._make_layer(block, 512, layers[3], down_size=True)
-        self.block3 = self._make_layer(block, 512, layers[3], down_size=False)
+        self.block3 = self._make_layer(block, 256, layers[3], down_size=True)
 
-        self.att_conv1 = self._make_layer(block, 512, layers[3], stride=1, down_size=False)
-        self.att_bn1 = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv2 = self._make_layer(block, 1024, layers[3], stride=1, down_size=True)
-        self.att_bn2 = nn.BatchNorm2d(1024 * block.expansion)
-        self.att_conv3 = self._make_layer(block, 512, layers[3], stride=1, down_size=False)
-        self.att_bn3 = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv1 = self._make_layer(block, 256, layers[3], stride=1, down_size=False)
+        self.att_bn1 = nn.BatchNorm2d(256 * block.expansion)
+        self.att_conv2 = self._make_layer(block, 512, layers[3], stride=1, down_size=True)
+        self.att_bn2 = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv3 = self._make_layer(block, 256, layers[3], stride=1, down_size=True)
+        self.att_bn3 = nn.BatchNorm2d(256 * block.expansion)
 
         #self.layer4 = self._make_layer(block, 256, layers[3], stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(14, stride=1)
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(256 * block.expansion, num_classes)
         #self.fc = nn.Sequential(nn.Dropout(p= self.dropout), nn.Linear(512 * block.expansion, num_classes))
 
         for m in self.modules():
@@ -180,7 +180,7 @@ class ResNet(nn.Module):
 
         # block 1
         ax = self.block1(x)
-        ex =ax
+        ex = ax
 
         # block 2, 3
         ax = self.block2(ax)
@@ -235,9 +235,9 @@ class ResNet(nn.Module):
         rx = self.block2(rx)
         rx = self.block3(rx)
         rx = self.avgpool(rx)
+
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
-
 
         return rx, att, w
 
@@ -294,5 +294,7 @@ def resnet152(pretrained=False, **kwargs):
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
     return model
+
+
 
 
