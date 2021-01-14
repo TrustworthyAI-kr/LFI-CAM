@@ -9,12 +9,12 @@ Maintainer : [Tsubasa Hirakawa](https://github.com/thirakawa)
 
 - Catdog
 ```
-python imagenet.py -a resnet18 --data ./data/catdog --epochs 300 --checkpoint c$
+python imagenet.py -a resnet18 --data ./data/catdog --epochs 300 --checkpoint checkpoints/catdog/abn --gpu-id 0,1,2,3 --lr 0.1 --schedule 150 225 --num_classes 2
 ```
 
 - STL10
 ```
-python stl.py -a resnet18 --epochs 300 --checkpoint checkpoints/stl/abn --gpu-i$
+python stl.py -a resnet18 --epochs 300 --checkpoint checkpoints/stl/abn --gpu-id 0,1,2,3 --lr 0.1 --schedule 150 225
 ```
 
 
