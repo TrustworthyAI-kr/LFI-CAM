@@ -6,6 +6,18 @@ Maintainer : [Tsubasa Hirakawa](https://github.com/thirakawa)
 
 # Quick Runs
 
+
+- Catdog
+```
+python imagenet.py -a resnet18 --data ./data/catdog --epochs 300 --checkpoint c$
+```
+
+- STL10
+```
+python stl.py -a resnet18 --epochs 300 --checkpoint checkpoints/stl/abn --gpu-i$
+```
+
+
 ## Using CIFAR-10 or CIFAR-100
 - Training & Evaluating from Scratch
 ```
