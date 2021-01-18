@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import math
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
+#from sklearn.preprocessing import MinMaxScaler
 
 __all__ = ['resnet']
 
