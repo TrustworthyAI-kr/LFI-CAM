@@ -192,6 +192,7 @@ class ResNet(nn.Module):
         fx = ax
 
         ax = self.avgpool(ax)
+
         bx = ax.view(ax.size(0), -1)
         w = F.softmax(bx)
 
@@ -221,7 +222,6 @@ class ResNet(nn.Module):
         att= score_saliency_map
 
         # attention mechanism
-
         rx = att * ex
         rx = rx + ex
 
@@ -230,7 +230,6 @@ class ResNet(nn.Module):
         rx = self.block2(rx)
         rx = self.block3(rx)
         rx = self.avgpool(rx)
-
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
 

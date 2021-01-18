@@ -4,6 +4,7 @@ Copyright (c) Wei YANG, 2017
 '''
 from __future__ import print_function
 
+import cv2
 import argparse
 import os
 import shutil
@@ -19,7 +20,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import models.cifar as models
-
+from os import path
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 
 
@@ -106,9 +107,10 @@ if use_cuda:
     torch.cuda.manual_seed_all(args.manualSeed)
 
 best_acc = 0  # best test accuracy
+best_epoch =0
 
 def main():
-    global best_acc
+    global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
 
     if not os.path.isdir(args.checkpoint):
@@ -192,6 +194,7 @@ def main():
         args.checkpoint = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
         best_acc = checkpoint['best_acc']
+        best_epoch  = checkpoint['best_epoch']
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -237,15 +240,18 @@ def main():
                 'state_dict': model.state_dict(),
                 'acc': test_acc,
                 'best_acc': best_acc,
+                'best_epoch': best_epoch,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint=args.checkpoint)
+
+        print("Best acc: %f , Epoch: %d" % (best_acc, best_epoch))
 
     logger.close()
     logger.plot()
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
     print("Best acc: %f , Epoch: %d" % (best_acc, best_epoch))
- 
+
 
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode
@@ -315,6 +321,7 @@ def test(testloader, model, criterion, epoch, use_cuda):
     with torch.no_grad():
         end = time.time()
         bar = Bar('Processing', max=len(testloader))
+        count = 0
         for batch_idx, (inputs, targets) in enumerate(testloader):
             # measure data loading time
             data_time.update(time.time() - end)
@@ -331,8 +338,9 @@ def test(testloader, model, criterion, epoch, use_cuda):
             d_inputs = inputs.data.cpu()
             d_inputs = d_inputs.numpy()
 
+
             in_b, in_c, in_y, in_x = inputs.shape
-            for item_img, item_att in zip(d_inputs, c_att):
+            for item_img, item_att in zip(d_inputs,  c_att):
 
                 ## img directories
                 out_dir = path.join('output')
