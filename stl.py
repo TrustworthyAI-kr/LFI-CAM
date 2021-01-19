@@ -124,17 +124,15 @@ if use_cuda:
     torch.cuda.manual_seed_all(args.manualSeed)
 
 best_acc = 0  # best test accuracy
-best_loss = 100 # loss of the best test acc model
 best_epoch =0
 
-
-
 def main():
-    global best_acc, best_loss, best_epoch
+    global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
 
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
+
 
     # Data loading code
     print('==> Preparing dataset')
@@ -147,7 +145,8 @@ def main():
     ])
 
     transform_test = transforms.Compose([
-        transforms.Resize(224),
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -200,7 +199,7 @@ def main():
         resume_folder = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
         best_acc = checkpoint['best_acc']
-        best_loss = checkpoint['best_loss']
+        best_epoch = checkpoint['best_epoch']
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -235,21 +234,20 @@ def main():
         logger.append([state['lr'], train_loss, test_loss, train_acc, test_acc])
 
         # save model
-        is_best = (test_acc > best_acc) or ((test_acc == best_acc) and (test_loss < best_loss))
+        is_best = (test_acc > best_acc)
 
         if is_best:
             best_acc = test_acc
-            best_loss = test_loss
             best_epoch = epoch+1
 
-        print("Best acc: %f , Epoch: %d, Loss: %f" % (best_acc, best_epoch, best_loss))
+        print("Best acc: %f , Epoch: %d" % (best_acc, best_epoch))
 
         save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
                 'acc': test_acc,
                 'best_acc': best_acc,
-                'best_loss': best_loss,
+                'best_epoch': best_epoch,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, checkpoint=args.checkpoint)
 
@@ -257,7 +255,7 @@ def main():
     logger.plot()
     savefig(os.path.join(args.checkpoint, 'log.eps'))
 
-    print("Best acc: %f , Epoch: %d, Loss: %f" % (best_acc, best_epoch, best_loss))
+    print("Best acc: %f , Epoch: %d" % (best_acc, best_epoch))
 
 
 
@@ -282,7 +280,7 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
             inputs, targets = inputs.cuda(), targets.cuda()
 
         # compute output
-        outputs,  _  = model(inputs)
+        outputs, _  = model(inputs)
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
