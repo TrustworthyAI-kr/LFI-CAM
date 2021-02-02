@@ -25,3 +25,10 @@ venv
 # weight files
 checkpoint
 checkpoints
+
+# dataset files
+data
+
+
+# ouput files
+output
