@@ -161,38 +161,40 @@ class ResNet(nn.Module):
         input = x
 
         # feature extractor
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)  # 32x32
+        fe = self.conv1(x)
+        fe = self.bn1(fe)
+        fe = self.relu(fe)  # 32x32
 
-        x = self.layer1(x)  # 32x32
-        x = self.layer2(x)  # 16x16 (cifar)
+        fe = self.layer1(fe)  # 32x32
+        fe = self.layer2(fe)  # 16x16 (cifar)
 
         # block 1, 2, 3
-        ax = self.block1(x)
-        ax = self.block2(ax)
-        ax = self.block3(ax)
+        bx = self.block1(fe)
+        bx = self.block2(bx)
+        bx = self.block3(bx)
 
         # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
         input_resized = F.interpolate(input_gray, (16, 16), mode='bilinear')
 
         # feature * image (before attention cal.)
-        fe = ax
-        new_fe = fe * input_resized
+        pe = bx
+        new_pe = pe * input_resized
 
         # feature importance extractor
-        ax = self.att_conv1(new_fe)
+        ax = self.att_conv1(new_pe)
         ax = self.att_bn1(ax)
         ax = self.avgpool(ax)
         w = F.softmax(ax.view(ax.size(0), -1))
 
         # Weighted sum of features and attention map
-        b, c, u, v = x.size()
+        fe_clone = fe.clone().detach().cuda()
+        b, c, u, v = fe_clone.size()
+         
         score_saliency_map = torch.zeros((b, 1, u, v)).cuda()
 
         for i in range(c):
-            saliency_map = torch.unsqueeze(fe[:, i, :, :], 1)
+            saliency_map = torch.unsqueeze(fe_clone[:, i, :, :], 1)
             score = torch.unsqueeze(torch.unsqueeze(torch.unsqueeze(w[:, i], 1), 1), 1)
             score_saliency_map += score * saliency_map
 
