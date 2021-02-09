@@ -12,9 +12,11 @@ import torch
 import torch.nn as nn
 import math
 import numpy as np
-#from sklearn.preprocessing import MinMaxScaler
+
+# from sklearn.preprocessing import MinMaxScaler
 
 __all__ = ['resnet']
+
 
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
@@ -101,7 +103,7 @@ class ResNet(nn.Module):
         assert (depth - 2) % 6 == 0, 'depth should be 6n+2'
         n = (depth - 2) // 6
 
-        block = Bottleneck if depth >=44 else BasicBlock
+        block = Bottleneck if depth >= 44 else BasicBlock
 
         self.inplanes = 16
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1,
@@ -115,13 +117,13 @@ class ResNet(nn.Module):
         self.block2 = self._make_layer(block, 64, n, stride=1, down_size=True)
         self.block3 = self._make_layer(block, 32, n, stride=1, down_size=True)
 
-        self.att_conv1  = self._make_layer(block, 32, n, stride=1, down_size= False)
-        self.att_bn1 = nn.BatchNorm2d(32* block.expansion)
+        self.att_conv1 = self._make_layer(block, 32, n, stride=1, down_size=False)
+        self.att_bn1 = nn.BatchNorm2d(32 * block.expansion)
 
-        #self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
+        # self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(16)
         self.fc = nn.Linear(32 * block.expansion, num_classes)
-        #self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
+        # self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -155,21 +157,20 @@ class ResNet(nn.Module):
             ##print(nn.Sequential(*layers))
             return nn.Sequential(*layers)
 
-
     def forward(self, x):
-        input =x
+        input = x
 
         # feature extractor
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)    # 32x32
+        x = self.relu(x)  # 32x32
 
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16 (cifar)
 
         # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
-        input_resized = F.interpolate(input_gray,(16, 16), mode='bilinear')
+        input_resized = F.interpolate(input_gray, (16, 16), mode='bilinear')
 
         # block 1
         ax = self.block1(x)
@@ -180,15 +181,16 @@ class ResNet(nn.Module):
         ax = self.block3(ax)
 
         fe = ax
+        # fe = (fe - fe.min()).div(fe.max() - fe.min())
         new_fe = fe * input_resized
 
         # feature importance extractor
         ax = self.att_conv1(new_fe)
         ax = self.att_bn1(ax)
-        #ax = self.att_conv2(ax)
-        #ax = self.att_bn2(ax)
-        #ax = self.att_conv3(ax)
-        #ax = self.att_bn3(ax)
+        # ax = self.att_conv2(ax)
+        # ax = self.att_bn2(ax)
+        # ax = self.att_conv3(ax)
+        # ax = self.att_bn3(ax)
         fx = ax
 
         ax = self.avgpool(ax)
@@ -197,19 +199,19 @@ class ResNet(nn.Module):
         w = F.softmax(bx)
 
         b, c, u, v = fe.size()
-        score_saliency_map= torch.zeros((b,1,u,v)).cuda()
+        score_saliency_map = torch.zeros((b, 1, u, v)).cuda()
 
         for i in range(c):
-            saliency_map = torch.unsqueeze(fe[:, i,:,:], 1)
+            saliency_map = torch.unsqueeze(fe[:, i, :, :], 1)
 
-            #if saliency_map.max() == saliency_map.min():
+            # if saliency_map.max() == saliency_map.min():
             #    continue
 
             # norm
-            #norm_saliency_map = (saliency_map - saliency_map.min()) / (saliency_map.max() - saliency_map.min())
+            # norm_saliency_map = (saliency_map - saliency_map.min()) / (saliency_map.max() - saliency_map.min())
 
-            score = torch.unsqueeze(torch.unsqueeze(torch.unsqueeze(w[:,i],1),1),1)
-            score_saliency_map += score* saliency_map
+            score = torch.unsqueeze(torch.unsqueeze(torch.unsqueeze(w[:, i], 1), 1), 1)
+            score_saliency_map += score * saliency_map
 
         score_saliency_map = F.relu(score_saliency_map)
         score_saliency_map_min, score_saliency_map_max = score_saliency_map.min(), score_saliency_map.max()
@@ -217,16 +219,16 @@ class ResNet(nn.Module):
         if score_saliency_map_min == score_saliency_map_max:
             return None
 
-        score_saliency_map = (score_saliency_map - score_saliency_map_min).div(score_saliency_map_max - score_saliency_map_min).data
+        score_saliency_map = (score_saliency_map - score_saliency_map_min).div(
+            score_saliency_map_max - score_saliency_map_min).data
 
-        att= score_saliency_map
+        att = score_saliency_map
 
         # attention mechanism
         rx = att * ex
         rx = rx + ex
 
         # classifier 1
-
         rx = self.block2(rx)
         rx = self.block3(rx)
         rx = self.avgpool(rx)
@@ -234,7 +236,6 @@ class ResNet(nn.Module):
         rx = self.fc(rx)
 
         return rx, att
-
 
 
 def resnet(**kwargs):
