@@ -1,12 +1,4 @@
 from __future__ import absolute_import
-
-'''Resnet for cifar dataset.
-Ported form
-https://github.com/facebook/fb.resnet.torch
-and
-https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
-(c) YANG, Wei
-'''
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -102,7 +94,7 @@ class ResNet(nn.Module):
         # Model type specifies number of layers for CIFAR-10 model
         assert (depth - 2) % 6 == 0, 'depth should be 6n+2'
         n = (depth - 2) // 6
-
+        print("It's LFIv2 network!!!!!")
         block = Bottleneck if depth >= 44 else BasicBlock
 
         self.inplanes = 16
@@ -122,8 +114,8 @@ class ResNet(nn.Module):
 
         # self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(16)
-        self.fc = nn.Linear(32 * block.expansion, num_classes)
-        # self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
+        # self.fc = nn.Linear(32 * block.expansion, num_classes)
+        self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(32 * block.expansion, num_classes))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -179,6 +171,7 @@ class ResNet(nn.Module):
 
         # feature * image (before attention cal.)
         fe = ax
+        fe = (fe - fe.min()).div(fe.max() - fe.min())
         new_fe = fe * input_resized
 
         # feature importance extractor
