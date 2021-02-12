@@ -251,16 +251,6 @@ def main():
     print("Best acc: %f , Epoch: %d" % (best_acc, best_epoch))
 
 
-def softmax_with_temperature(z, T) : 
-    z = np.array(z)
-    z = z / T 
-    max_z = np.max(z) 
-    exp_z = np.exp(z-max_z) 
-    sum_exp_z = np.sum(exp_z)
-    y = exp_z / sum_exp_z
-    return y
-
-
 def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     # switch to train mode
     model.train()
@@ -282,8 +272,6 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
 
         # compute output
         outputs, _ = model(inputs)
-        # outputs = F.softmax(torch.div(outputs, args.temperature))
-        # outputs = softmax_with_temperature(outputs, args.temperature)
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
