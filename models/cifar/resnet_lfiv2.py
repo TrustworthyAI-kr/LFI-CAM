@@ -1,12 +1,4 @@
 from __future__ import absolute_import
-
-'''Resnet for cifar dataset.
-Ported form
-https://github.com/facebook/fb.resnet.torch
-and
-https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
-(c) YANG, Wei
-'''
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -102,7 +94,9 @@ class ResNet(nn.Module):
         # Model type specifies number of layers for CIFAR-10 model
         assert (depth - 2) % 6 == 0, 'depth should be 6n+2'
         n = (depth - 2) // 6
+
         print("It's LFIv2 network!!!!!!!!")
+
         block = Bottleneck if depth >= 44 else BasicBlock
 
         self.inplanes = 16
