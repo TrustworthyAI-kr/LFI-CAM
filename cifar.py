@@ -22,7 +22,10 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import models.cifar as models
 from os import path
-from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
+from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig, config
+
+from tensorboardX import SummaryWriter
+from datetime import datetime
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -77,6 +80,11 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
 parser.add_argument('--gpu-id', default='0', type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
 
+parser.add_argument('--board-path', '--bp', default='board', type=str,
+                    help='tensorboardx path')
+parser.add_argument('--board-tag', '--tg', default='tag', type=str,
+                    help='tensorboardx writer tag')
+
 args = parser.parse_args()
 state = {k: v for k, v in args._get_kwargs()}
 
@@ -109,6 +117,24 @@ if use_cuda:
 best_acc = 0  # best test accuracy
 best_epoch = 0
 
+board_time = datetime.now().isoformat()
+writer_train = SummaryWriter(
+    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}".format(args.arch,
+                                                                                                 args.depth,
+                                                                                                 args.train_batch,
+                                                                                                 args.lr,
+                                                                                                 args.weight_decay,
+                                                                                                 args.board_tag),
+                         board_time, "train"))
+writer_test = SummaryWriter(
+    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}".format(args.arch,
+                                                                                                 args.depth,
+                                                                                                 args.train_batch,
+                                                                                                 args.lr,
+                                                                                                 args.weight_decay,
+                                                                                                 args.board_tag),
+                         board_time, "test"))
+
 
 def main():
     global best_acc, best_epoch
@@ -116,6 +142,7 @@ def main():
 
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
+    config.save_config(args, os.path.join(args.checkpoint, "config.txt"))
 
     # Data
     print('==> Preparing dataset %s' % args.dataset)
@@ -271,7 +298,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
 
         # compute output
         outputs, _ = model(inputs)
-        outputs = F.softmax(outputs)
+        # outputs = F.softmax(outputs)
         loss = criterion(outputs, targets)
 
         # measure accuracy and record loss
@@ -301,7 +328,22 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
             top1=top1.avg,
             top5=top5.avg,
         )
+        n_iter = epoch * len(trainloader) + batch_idx + 1
+        writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
+        writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
+        writer_train.add_scalar('Train/top5', prec5.data.item(), n_iter)
+
         bar.next()
+
+    writer_train.add_scalar('Avg.loss', losses.avg, epoch)
+    writer_train.add_scalar('Avg.top1', top1.avg, epoch)
+    writer_train.add_scalar('Avg.top5', top5.avg, epoch)
+
+    for name, param in model.named_parameters():
+        layer, attr = os.path.splitext(name)
+        attr = attr[1:]
+        writer_train.add_histogram("{}/{}".format(layer, attr), param, epoch)
+
     bar.finish()
     return (losses.avg, top1.avg)
 
@@ -397,7 +439,16 @@ def test(testloader, model, criterion, epoch, use_cuda):
                 top1=top1.avg,
                 top5=top5.avg,
             )
+            n_iter = epoch * len(testloader) + batch_idx + 1
+            writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
+            writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
+            writer_test.add_scalar('Test/top5', prec5.data.item(), n_iter)
             bar.next()
+
+        writer_test.add_scalar('Avg.loss', losses.avg, epoch)
+        writer_test.add_scalar('Avg.top1', top1.avg, epoch)
+        writer_test.add_scalar('Avg.top5', top5.avg, epoch)
+
         bar.finish()
     return (losses.avg, top1.avg)
 
