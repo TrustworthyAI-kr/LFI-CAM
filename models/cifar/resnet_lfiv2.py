@@ -102,7 +102,7 @@ class ResNet(nn.Module):
         # Model type specifies number of layers for CIFAR-10 model
         assert (depth - 2) % 6 == 0, 'depth should be 6n+2'
         n = (depth - 2) // 6
-
+        print("It's LFIv2 network!!!!!!!!")
         block = Bottleneck if depth >= 44 else BasicBlock
 
         self.inplanes = 16
@@ -119,11 +119,11 @@ class ResNet(nn.Module):
 
         self.att_conv1 = self._make_layer(block, 32, n, stride=1, down_size=False)
         self.att_bn1 = nn.BatchNorm2d(32 * block.expansion)
-
+        self.softmax = nn.Softmax(-1)
         # self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
         self.avgpool = nn.AvgPool2d(16)
-        self.fc = nn.Linear(32 * block.expansion, num_classes)
-        # self.fc = nn.Sequential(nn.Dropout(p= 0.5), nn.Linear(64 * block.expansion, num_classes))
+        # self.fc = nn.Linear(32 * block.expansion, num_classes)
+        self.fc = nn.Sequential(nn.Dropout(p=0.5), nn.Linear(32 * block.expansion, num_classes))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -179,13 +179,14 @@ class ResNet(nn.Module):
 
         # feature * image (before attention cal.)
         fe = ax
+        fe = (fe - fe.min()).div(fe.max() - fe.min())
         new_fe = fe * input_resized
 
         # feature importance extractor
         ax = self.att_conv1(new_fe)
         ax = self.att_bn1(ax)
         ax = self.avgpool(ax)
-        w = F.softmax(ax.view(ax.size(0), -1))
+        w = self.softmax(ax.view(ax.size(0), -1))
 
         b, c, u, v = fe.size()
         score_saliency_map = torch.zeros((b, 1, u, v)).cuda()
