@@ -120,7 +120,7 @@ best_epoch = 0
 
 board_time = datetime.now().isoformat()
 writer_train = SummaryWriter(
-    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}".format(args.arch,
+    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
                                                                                                  args.depth,
                                                                                                  args.train_batch,
                                                                                                  args.lr,
@@ -128,7 +128,7 @@ writer_train = SummaryWriter(
                                                                                                  args.board_tag),
                          board_time, "train"))
 writer_test = SummaryWriter(
-    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}".format(args.arch,
+    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
                                                                                                  args.depth,
                                                                                                  args.train_batch,
                                                                                                  args.lr,
@@ -141,6 +141,7 @@ def main():
     global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
 
+    # args.checkpoint = os.path.join(args.checkpoint, board_time)
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
     config.save_config(args, os.path.join(args.checkpoint, "config.txt"))
