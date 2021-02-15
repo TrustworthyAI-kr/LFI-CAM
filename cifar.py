@@ -51,6 +51,8 @@ parser.add_argument('--drop', '--dropout', default=0, type=float,
                     metavar='Dropout', help='Dropout ratio')
 parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
                     help='Decrease learning rate at these epochs.')
+parser.add_argument('--optim', default='sgd', type=str,
+                    help='optimizer [sgd,adamw] (default: sgd)')
 parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
 parser.add_argument('--temperature', type=float, default=0.1, help='temperature scaling')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
@@ -210,8 +212,10 @@ def main():
     print('    Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
+    if args.optim is "adamw":
+        optimizer = optim.adamw(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     # Resume
     title = 'cifar-10-' + args.arch
     if args.resume:
