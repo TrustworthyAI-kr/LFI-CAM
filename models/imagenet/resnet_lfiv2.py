@@ -116,14 +116,9 @@ class ResNet(nn.Module):
 
         self.att_conv1 = self._make_layer(block, 256, layers[3], stride=1, down_size=False)
         self.att_bn1 = nn.BatchNorm2d(256 * block.expansion)
-        # self.att_conv2 = self._make_layer(block, 512, layers[3], stride=1, down_size=True)
-        # self.att_bn2 = nn.BatchNorm2d(512 * block.expansion)
-        # self.att_conv3 = self._make_layer(block, 256, layers[3], stride=1, down_size=True)
-        # self.att_bn3 = nn.BatchNorm2d(256 * block.expansion)
-
         self.avgpool = nn.AvgPool2d(14, stride=1)
-        self.fc = nn.Linear(256 * block.expansion, num_classes)
-        # self.fc = nn.Sequential(nn.Dropout(p= self.dropout), nn.Linear(512 * block.expansion, num_classes))
+        # self.fc = nn.Linear(256 * block.expansion, num_classes)
+        self.fc = nn.Sequential(nn.Dropout(p= self.dropout), nn.Linear(256 * block.expansion, num_classes))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -175,6 +170,7 @@ class ResNet(nn.Module):
         ax = self.block1(x)
         ax = self.block2(ax)
         ax = self.block3(ax)
+        ex = ax
 
         # resize input to (32, 1, 14, 14)
         input_gray = torch.mean(input, dim=1, keepdim=True)
@@ -182,6 +178,7 @@ class ResNet(nn.Module):
 
         # feature * image (before attention cal.)
         fe = ax
+        fe = (fe - fe.min()).div(fe.max() - fe.min())
         new_fe = fe * input_resized
 
         # feature importance extractor
@@ -210,8 +207,10 @@ class ResNet(nn.Module):
         att = score_saliency_map
 
         # attention mechanism
-        rx = att * fe
-        rx = rx + fe
+        # rx = att * fe
+        # rx = rx + fe
+        rx = att * ex
+        rx = rx + ex
 
         # classifier
         rx = self.avgpool(rx)
