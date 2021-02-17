@@ -29,6 +29,10 @@ checkpoints
 # dataset files
 data
 
-
 # ouput files
 output
+
+# image files
+.png
+.jpg
+.jpeg
