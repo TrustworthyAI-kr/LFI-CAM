@@ -171,6 +171,7 @@ class ResNet(nn.Module):
         ax = self.block1(x)
         ax = self.block2(ax)
         ax = self.block3(ax)
+        ex = ax
 
         # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
@@ -205,8 +206,10 @@ class ResNet(nn.Module):
         att = score_saliency_map
 
         # attention mechanism
-        rx = att * fe
-        rx = rx + fe
+        # rx = att * fe
+        # rx = rx + fe
+        rx = att * ex
+        rx = rx + ex
 
         # classifier
         rx = self.avgpool(rx)
