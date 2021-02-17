@@ -346,10 +346,10 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
     writer_train.add_scalar('Avg.top1', top1.avg, epoch)
     writer_train.add_scalar('Avg.top5', top5.avg, epoch)
 
-    for name, param in model.named_parameters():
-        layer, attr = os.path.splitext(name)
-        attr = attr[1:]
-        writer_train.add_histogram("{}/{}".format(layer, attr), param, epoch)
+    # for name, param in model.named_parameters():
+    #     layer, attr = os.path.splitext(name)
+    #     attr = attr[1:]
+    #     writer_train.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
     bar.finish()
     return (losses.avg, top1.avg)
