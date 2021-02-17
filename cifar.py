@@ -143,7 +143,7 @@ def main():
     global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
 
-    # args.checkpoint = os.path.join(args.checkpoint, board_time)
+    args.checkpoint = os.path.join(args.checkpoint, board_time)
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
     config.save_config(args, os.path.join(args.checkpoint, "config.txt"))
