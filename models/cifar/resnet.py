@@ -181,7 +181,7 @@ class ResNet(nn.Module):
         ax = self.block3(ax)
 
         fe = ax
-        # fe = (fe - fe.min()).div(fe.max() - fe.min())
+        fe = (fe - fe.min()).div(fe.max() - fe.min())
         new_fe = fe * input_resized
 
         # feature importance extractor

@@ -120,7 +120,7 @@ class ResNet(nn.Module):
         self.softmax = nn.Softmax(-1)
         self.avgpool = nn.AvgPool2d(16)
         self.fc = nn.Sequential(
-            nn.Dropout(p=0.5),
+            # nn.Dropout(p=0.5),
             nn.Linear(32 * block.expansion, num_classes)
         )
 
