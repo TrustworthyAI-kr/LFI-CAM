@@ -424,8 +424,8 @@ def test(testloader, model, criterion, epoch, use_cuda):
                     attpath = os.path.join(os.path.dirname(args.resume), 'att')
                     if not path.exists(attpath):
                         os.mkdir(attpath)
-                    np.save(os.path.join(attpath, "{0:06d}".format(count)), resize_att)
-
+                    # np.save(os.path.join(attpath, "{0:06d}".format(count)), resize_att)
+                    np.save(os.path.join(attpath, "{0:06d}".format(count)), vis_map)
                 count += 1
 
             # measure accuracy and record loss

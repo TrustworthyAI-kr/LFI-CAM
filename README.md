@@ -96,5 +96,14 @@ python3 imagenet.py -a resnet152 --data ../../../../dataset/imagenet_data/ --epo
 ### Examples of attention map
 ![overview image](./example.jpeg)
 
+### IoU Calculation
+1. Assuming you have trained two models to compare, create attention npy files
+```
+ python cifar.py -a resnet --depth 110 --dataset cifar100 --epochs 1 --evaluate --resume /base/path/checkpoint.pth.tar --gpu-id 0
+```
+2. Compare attention values
+```
+python  utils/metrics.py  --att-base /base/path/att --att-target /target/path/att --threshold 100
 
+```
 
