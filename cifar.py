@@ -420,6 +420,12 @@ def test(testloader, model, criterion, epoch, use_cuda):
                 c1 = np.concatenate((v_img, blend), axis=1)
                 cv2.imwrite(out_path, c1)
 
+                if args.evaluate:
+                    attpath = os.path.join(os.path.dirname(args.resume), 'att')
+                    if not path.exists(attpath):
+                        os.mkdir(attpath)
+                    np.save(os.path.join(attpath, "{0:06d}".format(count)), resize_att)
+
                 count += 1
 
             # measure accuracy and record loss

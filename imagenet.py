@@ -49,7 +49,7 @@ model_names = customized_models_names
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
 # Datasets
-parser.add_argument('-d', '--data', default='path to dataset', type=str)
+parser.add_argument('-d', '--dataset', default='path to dataset', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 # Optimization options
@@ -75,7 +75,7 @@ parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
 parser.add_argument('--num_classes', type=int, default=2)
 
 # Checkpoints
-parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH',
+parser.add_argument('-c', '--checkpoint', default='../checkpoint', type=str, metavar='PATH',
                     help='path to save checkpoint (default: checkpoint)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
@@ -100,7 +100,7 @@ parser.add_argument('--pretrained', dest='pretrained', action='store_true',
 parser.add_argument('--gpu-id', default='0', type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
 
-parser.add_argument('--board-path', '--bp', default='board', type=str,
+parser.add_argument('--board-path', '--bp', default='../board', type=str,
                     help='tensorboardx path')
 parser.add_argument('--board-tag', '--tg', default='tag', type=str,
                     help='tensorboardx writer tag')
@@ -137,20 +137,36 @@ best_epoch = 0
 board_time = datetime.now().isoformat()
 writer_train = SummaryWriter(
     log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
-                                                                                                 args.depth,
-                                                                                                 args.train_batch,
-                                                                                                 args.lr,
-                                                                                                 args.weight_decay,
-                                                                                                 args.board_tag),
+                                                                                                    args.depth,
+                                                                                                    args.train_batch,
+                                                                                                    args.lr,
+                                                                                                    args.weight_decay,
+                                                                                                    args.board_tag),
                          board_time, "train"))
 writer_test = SummaryWriter(
     log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
-                                                                                                 args.depth,
-                                                                                                 args.train_batch,
-                                                                                                 args.lr,
-                                                                                                 args.weight_decay,
-                                                                                                 args.board_tag),
+                                                                                                    args.depth,
+                                                                                                    args.train_batch,
+                                                                                                    args.lr,
+                                                                                                    args.weight_decay,
+                                                                                                    args.board_tag),
                          board_time, "test"))
+
+
+class ImageFolderWithPaths(datasets.ImageFolder):
+    """Custom dataset that includes image file paths. Extends
+    torchvision.datasets.ImageFolder
+    """
+
+    # override the __getitem__ method. this is the method that dataloader calls
+    def __getitem__(self, index):
+        # this is what ImageFolder normally returns
+        original_tuple = super(ImageFolderWithPaths, self).__getitem__(index)
+        # the image file path
+        path = self.imgs[index][0]
+        # make a new tuple that includes original and the path
+        tuple_with_path = (original_tuple + (path,))
+        return tuple_with_path
 
 
 def main():
@@ -163,8 +179,8 @@ def main():
     config.save_config(args, os.path.join(args.checkpoint, "config.txt"))
 
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
+    traindir = os.path.join(args.dataset, 'train')
+    valdir = os.path.join(args.dataset, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -179,12 +195,14 @@ def main():
         num_workers=args.workers, pin_memory=True)
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
+        # datasets.ImageFolder(
+        ImageFolderWithPaths(
+            valdir, transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                normalize,
+            ])),
         batch_size=args.test_batch, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -335,16 +353,16 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
             top1=top1.avg,
             top2=top2.avg
         )
-        n_iter = epoch * len(trainloader) + batch_idx + 1
+        n_iter = epoch * len(train_loader) + batch_idx + 1
         writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
         writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
-        writer_train.add_scalar('Train/top5', prec5.data.item(), n_iter)
+        writer_train.add_scalar('Train/top2', prec2.data.item(), n_iter)
 
         bar.next()
 
     writer_train.add_scalar('Avg.loss', losses.avg, epoch)
     writer_train.add_scalar('Avg.top1', top1.avg, epoch)
-    writer_train.add_scalar('Avg.top5', top5.avg, epoch)
+    writer_train.add_scalar('Avg.top2', top2.avg, epoch)
 
     # for name, param in model.named_parameters():
     #     layer, attr = os.path.splitext(name)
@@ -373,7 +391,8 @@ def test(val_loader, model, criterion, epoch, use_cuda):
         count = 0
         info_count = 0
 
-        for batch_idx, (inputs, targets) in enumerate(val_loader):
+        # for batch_idx, (inputs, targets) in enumerate(val_loader):
+        for batch_idx, (inputs, targets, paths) in enumerate(val_loader):
             # measure data loading time
             data_time.update(time.time() - end)
 
@@ -392,11 +411,12 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             d_inputs = d_inputs.numpy()
 
             in_b, in_c, in_y, in_x = inputs.shape
-            for item_img, item_att in zip(d_inputs, c_att):
+            # for item_img, item_att in zip(d_inputs, c_att):
+            for item_img, item_att, item_path in zip(d_inputs, c_att, paths):
 
                 ## img directories
                 out_dir = path.join('output')
-                if not path.exists(out_dir):
+                if not os.path.exists(out_dir):
                     os.mkdir(out_dir)
 
                 if not path.exists(path.join(out_dir, 'concat')):
@@ -427,6 +447,12 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 c1 = np.concatenate((v_img, blend), axis=1)
                 cv2.imwrite(out_path, c1)
 
+                # Attention value stacking for IoU / Dice calculation
+                if args.evaluate:
+                    attpath = os.path.join(os.path.dirname(args.resume), 'att')
+                    if not path.exists(attpath):
+                        os.mkdir(attpath)
+                    np.save(os.path.join(attpath, os.path.basename(item_path).replace(".jpg", "")), resize_att)
                 count += 1
 
             # measure accuracy and record loss
@@ -452,15 +478,15 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 top1=top1.avg,
                 top2=top2.avg,
             )
-            n_iter = epoch * len(testloader) + batch_idx + 1
+            n_iter = epoch * len(val_loader) + batch_idx + 1
             writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
             writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
-            writer_test.add_scalar('Test/top5', prec5.data.item(), n_iter)
+            writer_test.add_scalar('Test/top2', prec2.data.item(), n_iter)
             bar.next()
 
         writer_test.add_scalar('Avg.loss', losses.avg, epoch)
         writer_test.add_scalar('Avg.top1', top1.avg, epoch)
-        writer_test.add_scalar('Avg.top5', top5.avg, epoch)
+        writer_test.add_scalar('Avg.top2', top2.avg, epoch)
 
         bar.finish()
     return (losses.avg, top1.avg)
