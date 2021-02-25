@@ -136,20 +136,20 @@ best_epoch = 0
 
 board_time = datetime.now().isoformat()
 writer_train = SummaryWriter(
-    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
-                                                                                                    args.depth,
-                                                                                                    args.train_batch,
-                                                                                                    args.lr,
-                                                                                                    args.weight_decay,
-                                                                                                    args.board_tag),
+    log_dir=os.path.join(args.board_path, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
+                                                                                      args.depth,
+                                                                                      args.train_batch,
+                                                                                      args.lr,
+                                                                                      args.weight_decay,
+                                                                                      args.board_tag),
                          board_time, "train"))
 writer_test = SummaryWriter(
-    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
-                                                                                                    args.depth,
-                                                                                                    args.train_batch,
-                                                                                                    args.lr,
-                                                                                                    args.weight_decay,
-                                                                                                    args.board_tag),
+    log_dir=os.path.join(args.board_path, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
+                                                                                      args.depth,
+                                                                                      args.train_batch,
+                                                                                      args.lr,
+                                                                                      args.weight_decay,
+                                                                                      args.board_tag),
                          board_time, "test"))
 
 
