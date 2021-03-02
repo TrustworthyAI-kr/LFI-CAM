@@ -424,6 +424,12 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 c1 = np.concatenate((v_img, blend), axis=1)
                 cv2.imwrite(out_path, c1)
 
+                if args.evaluate:
+                    attpath = os.path.join(os.path.dirname(args.resume), 'att')
+                    if not path.exists(attpath):
+                        os.mkdir(attpath)
+                    # np.save(os.path.join(attpath, "{0:06d}".format(count)), resize_att)
+                    np.save(os.path.join(attpath, "{0:06d}".format(count)), vis_map)
                 count += 1
 
             # measure accuracy and record loss
@@ -449,15 +455,15 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 top1=top1.avg,
                 top2=top2.avg,
             )
-            n_iter = epoch * len(testloader) + batch_idx + 1
+            n_iter = epoch * len(val_loader) + batch_idx + 1
             writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
             writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
-            writer_test.add_scalar('Test/top5', prec5.data.item(), n_iter)
+            writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
             bar.next()
 
         writer_test.add_scalar('Avg.loss', losses.avg, epoch)
         writer_test.add_scalar('Avg.top1', top1.avg, epoch)
-        writer_test.add_scalar('Avg.top5', top5.avg, epoch)
+        writer_test.add_scalar('Avg.top5', top2.avg, epoch)
         bar.finish()
     return (losses.avg, top1.avg)
 
