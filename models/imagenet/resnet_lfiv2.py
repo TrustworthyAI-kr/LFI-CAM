@@ -188,9 +188,8 @@ class ResNet(nn.Module):
         a1, a2, a3, a4= fe.size()
         fe = fe.view(a1, a2, -1)
 
-        if fe.min(2, keepdim=True)[0] != fe.max(2, keepdim=True)[0]:
-            fe -= fe.min(2, keepdim=True)[0]
-            fe /= fe.max(2, keepdim=True)[0]
+        fe -= fe.min(2, keepdim=True)[0]
+        fe /= fe.max(2, keepdim=True)[0]+0.00001
         fe = fe.view(a1, a2, a3,a4)
 
         new_fe = fe * input_resized
