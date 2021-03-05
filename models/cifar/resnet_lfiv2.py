@@ -112,8 +112,16 @@ class ResNet(nn.Module):
         self.block3 = self._make_layer(block, 32, n, stride=1, down_size=True)
 
         self.attention = nn.Sequential(
-            self._make_layer(block, 32, n, stride=1, down_size=False),
+            nn.Conv2d(32 * block.expansion, 64 * block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.BatchNorm2d(64 * block.expansion),
+            nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.BatchNorm2d(64 * block.expansion),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64 * block.expansion, 32* block.expansion, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(32 * block.expansion),
+            nn.Conv2d(32 * block.expansion, 32 * block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.BatchNorm2d(32 * block.expansion),
+            nn.ReLU(inplace=True),
             nn.AvgPool2d(16)
         )
 
@@ -178,30 +186,34 @@ class ResNet(nn.Module):
         input_resized = F.interpolate(input_gray, (16, 16), mode='bilinear')
 
         # feature * image (before attention cal.)
-        fe = ax
-        fe = (fe - fe.min()).div(fe.max() - fe.min())
+        fe = ax.clone()
+        a1, a2, a3, a4= fe.size()
+        fe = fe.view(a1, a2, -1)
+
+        fe -= fe.min(2, keepdim=True)[0]
+        fe /= fe.max(2, keepdim=True)[0]+ 0.00001
+        fe = fe.view(a1, a2, a3,a4)
+
         new_fe = fe * input_resized
 
         # feature importance extractor
         ax = self.attention(new_fe)
-        w = self.softmax(ax.view(ax.size(0), -1))
+        w = (ax.view(ax.size(0), -1))
 
         b, c, u, v = fe.size()
         score_saliency_map = torch.zeros((b, 1, u, v)).cuda()
 
         for i in range(c):
-            saliency_map = torch.unsqueeze(fe[:, i, :, :], 1)
+            saliency_map = torch.unsqueeze(ex[:, i, :, :], 1)
             score = torch.unsqueeze(torch.unsqueeze(torch.unsqueeze(w[:, i], 1), 1), 1)
             score_saliency_map += score * saliency_map
 
         score_saliency_map = F.relu(score_saliency_map)
         score_saliency_map_min, score_saliency_map_max = score_saliency_map.min(), score_saliency_map.max()
 
-        if score_saliency_map_min == score_saliency_map_max:
-            return None
+        if score_saliency_map_min != score_saliency_map_max:
+            score_saliency_map = (score_saliency_map - score_saliency_map_min).div(score_saliency_map_max - score_saliency_map_min).data
 
-        score_saliency_map = (score_saliency_map - score_saliency_map_min).div(
-            score_saliency_map_max - score_saliency_map_min).data
 
         att = score_saliency_map
 

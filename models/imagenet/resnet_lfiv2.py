@@ -114,8 +114,15 @@ class ResNet(nn.Module):
         self.block2 = self._make_layer(block, 512, layers[3], down_size=True)
         self.block3 = self._make_layer(block, 256, layers[3], down_size=True)
 
-        self.att_conv1 = self._make_layer(block, 256, layers[3], stride=1, down_size=False)
-        self.att_bn1 = nn.BatchNorm2d(256 * block.expansion)
+        self.att_conv1 = nn.Conv2d(256 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn1 = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv2 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn2 = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv3 = nn.Conv2d(512 * block.expansion, 256* block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn3 = nn.BatchNorm2d(256 * block.expansion)
+        self.att_conv4 = nn.Conv2d(256 * block.expansion, 256 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn4 = nn.BatchNorm2d(256 * block.expansion)
+
         self.avgpool = nn.AvgPool2d(14, stride=1)
         self.fc = nn.Linear(256 * block.expansion, num_classes)
         #self.fc = nn.Sequential(nn.Dropout(p= self.dropout), nn.Linear(256 * block.expansion, num_classes))
@@ -177,38 +184,48 @@ class ResNet(nn.Module):
         input_resized = F.interpolate(input_gray, (14, 14), mode='bilinear')
 
         # feature * image (before attention cal.)
-        fe = ax
-        fe = (fe - fe.min()).div(fe.max() - fe.min())
+        fe = ax.clone()
+        a1, a2, a3, a4= fe.size()
+        fe = fe.view(a1, a2, -1)
+
+        fe -= fe.min(2, keepdim=True)[0]
+        fe /= fe.max(2, keepdim=True)[0]+0.00001
+        fe = fe.view(a1, a2, a3,a4)
+
         new_fe = fe * input_resized
 
         # feature importance extractor
         ax = self.att_conv1(new_fe)
         ax = self.att_bn1(ax)
+        ax = self.att_conv2(ax)
+        ax = self.att_bn2(ax)
+        ax = self.relu(ax)
+        ax = self.att_conv3(ax)
+        ax = self.att_bn3(ax)
+        ax = self.att_conv4(ax)
+        ax = self.att_bn4(ax)
+        ax = self.relu(ax)
+
         ax = self.avgpool(ax)
-        w = F.softmax(ax.view(ax.size(0), -1))
+        w = (ax.view(ax.size(0), -1))
 
         b, c, u, v = fe.size()
         score_saliency_map = torch.zeros((b, 1, u, v)).cuda()
 
         for i in range(c):
-            saliency_map = torch.unsqueeze(fe[:, i, :, :], 1)
+            saliency_map = torch.unsqueeze(ex[:, i, :, :], 1)
             score = torch.unsqueeze(torch.unsqueeze(torch.unsqueeze(w[:, i], 1), 1), 1)
             score_saliency_map += score * saliency_map
 
         score_saliency_map = F.relu(score_saliency_map)
         score_saliency_map_min, score_saliency_map_max = score_saliency_map.min(), score_saliency_map.max()
 
-        if score_saliency_map_min == score_saliency_map_max:
-            return None
-
-        score_saliency_map = (score_saliency_map - score_saliency_map_min).div(
-            score_saliency_map_max - score_saliency_map_min).data
+        if score_saliency_map_min != score_saliency_map_max:
+            score_saliency_map = (score_saliency_map - score_saliency_map_min).div(score_saliency_map_max - score_saliency_map_min).data
 
         att = score_saliency_map
 
         # attention mechanism
-        # rx = att * fe
-        # rx = rx + fe
         rx = att * ex
         rx = rx + ex
 
