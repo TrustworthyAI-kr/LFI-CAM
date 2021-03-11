@@ -407,57 +407,58 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             loss = criterion(outputs, targets)
             # attention, fe, per = attention
 
-            c_att = attention.data.cpu()
-            c_att = c_att.numpy()
-            d_inputs = inputs.data.cpu()
-            d_inputs = d_inputs.numpy()
+            if epoch > args.schedule[-1]:
+                c_att = attention.data.cpu()
+                c_att = c_att.numpy()
+                d_inputs = inputs.data.cpu()
+                d_inputs = d_inputs.numpy()
 
-            in_b, in_c, in_y, in_x = inputs.shape
-            # for item_img, item_att in zip(d_inputs, c_att):
-            for item_img, item_att, item_path in zip(d_inputs, c_att, paths):
+                in_b, in_c, in_y, in_x = inputs.shape
+                # for item_img, item_att in zip(d_inputs, c_att):
+                for item_img, item_att, item_path in zip(d_inputs, c_att, paths):
 
-                ## img directories
-                out_dir = path.join('output')
-                if not os.path.exists(out_dir):
-                    os.mkdir(out_dir)
+                    ## img directories
+                    out_dir = path.join('output')
+                    if not os.path.exists(out_dir):
+                        os.mkdir(out_dir)
 
-                if not path.exists(path.join(out_dir, 'concat')):
-                    os.mkdir(path.join(out_dir, 'concat'))
+                    if not path.exists(path.join(out_dir, 'concat')):
+                        os.mkdir(path.join(out_dir, 'concat'))
 
-                v_img = ((item_img.transpose((1, 2, 0)) + 0.5 + [0.485, 0.456, 0.406]) * [0.229, 0.224, 0.225]) * 256
-                v_img = v_img[:, :, ::-1]
-                resize_att = cv2.resize(item_att[0], (in_x, in_y))
-                resize_att *= 255.
-                org = v_img
+                    v_img = ((item_img.transpose((1, 2, 0)) + 0.5 + [0.485, 0.456, 0.406]) * [0.229, 0.224, 0.225]) * 256
+                    v_img = v_img[:, :, ::-1]
+                    resize_att = cv2.resize(item_att[0], (in_x, in_y))
+                    resize_att *= 255.
+                    org = v_img
 
-                # cv2.imwrite('stock1.png', v_img)
-                # cv2.imwrite('stock2.png', resize_att)
-                # v_img = cv2.imread('stock1.png')
-                # vis_map = cv2.imread('stock2.png')
-                vis_map = resize_att
+                    # cv2.imwrite('stock1.png', v_img)
+                    # cv2.imwrite('stock2.png', resize_att)
+                    # v_img = cv2.imread('stock1.png')
+                    # vis_map = cv2.imread('stock2.png')
+                    vis_map = resize_att
 
-                # pure attention map
-                vis_map = vis_map - np.min(vis_map)
-                vis_map = vis_map / np.max(vis_map)
-                vis_map = np.uint8(256 * vis_map)
+                    # pure attention map
+                    vis_map = vis_map - np.min(vis_map)
+                    vis_map = vis_map / np.max(vis_map)
+                    vis_map = np.uint8(256 * vis_map)
 
-                jet_map = cv2.applyColorMap(vis_map, cv2.COLORMAP_JET)
+                    jet_map = cv2.applyColorMap(vis_map, cv2.COLORMAP_JET)
 
-                # create blended img (original + heatmap)
-                blend = org * 0.6 + jet_map * 0.4
+                    # create blended img (original + heatmap)
+                    blend = org * 0.6 + jet_map * 0.4
 
-                out_path = path.join(out_dir, 'concat', '{0:06d}_concat.png'.format(count))
-                c1 = np.concatenate((v_img, blend), axis=1)
-                cv2.imwrite(out_path, c1)
+                    out_path = path.join(out_dir, 'concat', '{0:06d}_concat.png'.format(count))
+                    c1 = np.concatenate((v_img, blend), axis=1)
+                    cv2.imwrite(out_path, c1)
 
-                # Attention value stacking for IoU / Dice calculation
-                if args.evaluate:
-                    attpath = os.path.join(os.path.dirname(args.resume), 'att')
-                    if not path.exists(attpath):
-                        os.mkdir(attpath)
-                    # np.save(os.path.join(attpath, os.path.basename(item_path).replace(".jpg", "")), resize_att)
-                    np.save(os.path.join(attpath, os.path.basename(item_path).replace(".jpg", "")), vis_map)
-                count += 1
+                    # Attention value stacking for IoU / Dice calculation
+                    if args.evaluate:
+                        attpath = os.path.join(os.path.dirname(args.resume), 'att')
+                        if not path.exists(attpath):
+                            os.mkdir(attpath)
+                        # np.save(os.path.join(attpath, os.path.basename(item_path).replace(".jpg", "")), resize_att)
+                        np.save(os.path.join(attpath, os.path.basename(item_path).replace(".jpg", "")), vis_map)
+                    count += 1
 
             # measure accuracy and record loss
             prec1, prec2 = accuracy(outputs.data, targets.data, topk=(1, 2))
