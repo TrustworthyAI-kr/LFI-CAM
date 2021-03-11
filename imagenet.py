@@ -95,7 +95,8 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
-
+parser.add_argument('--enable_logging', action='store_true', default=False,
+                    help='enable logging')
 # Device options
 parser.add_argument('--gpu-id', default='0', type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
@@ -353,16 +354,17 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
             top1=top1.avg,
             top2=top2.avg
         )
-        n_iter = epoch * len(train_loader) + batch_idx + 1
-        writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
-        writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
-        writer_train.add_scalar('Train/top2', prec2.data.item(), n_iter)
+        if args.enable_logging:
+            n_iter = epoch * len(train_loader) + batch_idx + 1
+            writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
+            writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
+            writer_train.add_scalar('Train/top2', prec2.data.item(), n_iter)
 
         bar.next()
-
-    writer_train.add_scalar('Avg.loss', losses.avg, epoch)
-    writer_train.add_scalar('Avg.top1', top1.avg, epoch)
-    writer_train.add_scalar('Avg.top2', top2.avg, epoch)
+    if args.enable_logging:
+        writer_train.add_scalar('Avg.loss', losses.avg, epoch)
+        writer_train.add_scalar('Avg.top1', top1.avg, epoch)
+        writer_train.add_scalar('Avg.top2', top2.avg, epoch)
 
     # for name, param in model.named_parameters():
     #     layer, attr = os.path.splitext(name)
@@ -428,10 +430,11 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 resize_att *= 255.
                 org = v_img
 
-                cv2.imwrite('stock1.png', v_img)
-                cv2.imwrite('stock2.png', resize_att)
-                v_img = cv2.imread('stock1.png')
-                vis_map = cv2.imread('stock2.png')
+                # cv2.imwrite('stock1.png', v_img)
+                # cv2.imwrite('stock2.png', resize_att)
+                # v_img = cv2.imread('stock1.png')
+                # vis_map = cv2.imread('stock2.png')
+                vis_map = resize_att
 
                 # pure attention map
                 vis_map = vis_map - np.min(vis_map)
@@ -479,15 +482,17 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 top1=top1.avg,
                 top2=top2.avg,
             )
-            n_iter = epoch * len(val_loader) + batch_idx + 1
-            writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
-            writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
-            writer_test.add_scalar('Test/top2', prec2.data.item(), n_iter)
+            if args.enable_logging:
+                n_iter = epoch * len(val_loader) + batch_idx + 1
+                writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
+                writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
+                writer_test.add_scalar('Test/top2', prec2.data.item(), n_iter)
             bar.next()
 
-        writer_test.add_scalar('Avg.loss', losses.avg, epoch)
-        writer_test.add_scalar('Avg.top1', top1.avg, epoch)
-        writer_test.add_scalar('Avg.top2', top2.avg, epoch)
+        if args.enable_logging:
+            writer_test.add_scalar('Avg.loss', losses.avg, epoch)
+            writer_test.add_scalar('Avg.top1', top1.avg, epoch)
+            writer_test.add_scalar('Avg.top2', top2.avg, epoch)
 
         bar.finish()
     return (losses.avg, top1.avg)
