@@ -135,20 +135,18 @@ best_epoch = 0
 
 board_time = datetime.now().isoformat()
 writer_train = SummaryWriter(
-    log_dir=os.path.join(args.board_path, "stl", "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
+    log_dir=os.path.join(args.board_path, "stl", args.board_tag, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
                                                                                                  args.depth,
                                                                                                  args.train_batch,
                                                                                                  args.lr,
-                                                                                                 args.weight_decay,
-                                                                                                 args.board_tag),
+                                                                                                 args.weight_decay),
                          board_time, "train"))
 writer_test = SummaryWriter(
-    log_dir=os.path.join(args.board_path, "stl", "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
+    log_dir=os.path.join(args.board_path, "stl", args.board_tag, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
                                                                                                  args.depth,
                                                                                                  args.train_batch,
                                                                                                  args.lr,
-                                                                                                 args.weight_decay,
-                                                                                                 args.board_tag),
+                                                                                                 args.weight_decay),
                          board_time, "test"))
 
 
@@ -156,7 +154,7 @@ def main():
     global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
 
-    args.checkpoint = os.path.join(args.checkpoint, board_time)
+    args.checkpoint = os.path.join(args.checkpoint, "stl", args.board_tag, board_time)
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
 
@@ -336,13 +334,13 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
         n_iter = epoch * len(train_loader) + batch_idx + 1
         writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
         writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
-        writer_train.add_scalar('Train/top5', prec5.data.item(), n_iter)
+        writer_train.add_scalar('Train/top5', prec2.data.item(), n_iter)
 
         bar.next()
 
     writer_train.add_scalar('Avg.loss', losses.avg, epoch)
     writer_train.add_scalar('Avg.top1', top1.avg, epoch)
-    writer_train.add_scalar('Avg.top5', top5.avg, epoch)
+    writer_train.add_scalar('Avg.top5', top2.avg, epoch)
 
     # for name, param in model.named_parameters():
     #     layer, attr = os.path.splitext(name)
