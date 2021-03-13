@@ -333,7 +333,7 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
             top1=top1.avg,
             top2=top2.avg
         )
-        n_iter = epoch * len(trainloader) + batch_idx + 1
+        n_iter = epoch * len(train_loader) + batch_idx + 1
         writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
         writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
         writer_train.add_scalar('Train/top5', prec5.data.item(), n_iter)
