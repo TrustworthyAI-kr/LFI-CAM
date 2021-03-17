@@ -414,7 +414,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
             # input data perturbation
             if args.perturbation:
-                images = fgsm_attack(model, loss, images, targets, args.eps).cuda()
+                images = fgsm_attack(model, criterion, images, targets, args.eps).cuda()
 
             # compute output
             outputs, attention = model(inputs)
