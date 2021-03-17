@@ -12,7 +12,7 @@ import numpy as np
 import random
 import pickle
 import cv2
-
+from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -150,6 +150,14 @@ writer_test = SummaryWriter(
     log_dir=os.path.join(args.board_path, os.path.basename(args.dataset), common_path_name, board_time, "test"))
 
 
+def gaussian_blur(img):
+    image = np.array(img)
+    image_blur = cv2.GaussianBlur(image, (65, 65), 10)
+    new_image = image_blur
+    im = Image.fromarray(new_image)
+    return im
+
+
 class ImageFolderWithPaths(datasets.ImageFolder):
     """Custom dataset that includes image file paths. Extends
     torchvision.datasets.ImageFolder
@@ -197,6 +205,7 @@ def main():
             valdir, transforms.Compose([
                 transforms.Resize(256),
                 transforms.CenterCrop(224),
+                # transforms.Lambda(gaussian_blur),
                 transforms.ToTensor(),
                 normalize,
             ])),
@@ -252,8 +261,11 @@ def main():
         logger.set_names(['Learning Rate', 'Train Loss', 'Valid Loss', 'Train Acc.', 'Valid Acc.'])
 
     if args.evaluate:
-        print('\nEvaluation only')
-        test_loss, test_acc = test(val_loader, model, criterion, args.epochs, use_cuda)
+        print('\nEvaluation only - Perturbation mode {%d}' % args.perturbation)
+        if args.perturbation:
+            test_loss, test_acc = test_perturbation(val_loader, model, criterion, args.epochs, use_cuda)
+        else:
+            test_loss, test_acc = test(val_loader, model, criterion, args.epochs, use_cuda)
 
         if not path.exists(path.join(args.checkpoint, 'output')):
             os.mkdir(path.join(args.checkpoint, 'output'))
@@ -402,7 +414,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
         end = time.time()
         bar = Bar('Processing', max=len(val_loader))
         count = 0
-        info_count = 0
+        # info_count = 0
 
         # for batch_idx, (inputs, targets) in enumerate(val_loader):
         for batch_idx, (inputs, targets, paths) in enumerate(val_loader):
@@ -440,17 +452,18 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                     if not path.exists(path.join(out_dir, 'concat')):
                         os.mkdir(path.join(out_dir, 'concat'))
 
-                    v_img = ((item_img.transpose((1, 2, 0)) + 0.5 + [0.485, 0.456, 0.406]) * [0.229, 0.224, 0.225]) * 256
+                    v_img = ((item_img.transpose((1, 2, 0)) + 0.5 + [0.485, 0.456, 0.406]) * [0.229, 0.224,
+                                                                                              0.225]) * 256
                     v_img = v_img[:, :, ::-1]
                     resize_att = cv2.resize(item_att[0], (in_x, in_y))
                     resize_att *= 255.
                     org = v_img
 
-                    # cv2.imwrite('stock1.png', v_img)
-                    # cv2.imwrite('stock2.png', resize_att)
-                    # v_img = cv2.imread('stock1.png')
-                    # vis_map = cv2.imread('stock2.png')
-                    vis_map = resize_att
+                    cv2.imwrite('stock1.png', v_img)
+                    cv2.imwrite('stock2.png', resize_att)
+                    v_img = cv2.imread('stock1.png')
+                    vis_map = cv2.imread('stock2.png')
+                    # vis_map = resize_att
 
                     # pure attention map
                     vis_map = vis_map - np.min(vis_map)
@@ -487,10 +500,9 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             end = time.time()
 
             # plot progress
-            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top2: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
                 batch=batch_idx + 1,
-                size=len(testloader),
-                pt=args.perturbation,
+                size=len(val_loader),
                 data=data_time.avg,
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
@@ -511,6 +523,90 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             writer_test.add_scalar('Avg.top1', top1.avg, epoch)
             writer_test.add_scalar('Avg.top2', top2.avg, epoch)
 
+        bar.finish()
+    return (losses.avg, top1.avg)
+
+
+def fgsm_attack(model, loss, images, labels, eps=0.07):
+    images.requires_grad = True
+
+    outputs, _ = model(images)
+
+    model.zero_grad()
+    cost = loss(outputs, labels)
+    cost.backward()
+
+    attack_images = images + eps * images.grad.sign()
+    attack_images = torch.clamp(attack_images, 0, 1)
+
+    return attack_images
+
+
+def test_perturbation(val_loader, model, criterion, epoch, use_cuda):
+    global best_acc
+    softmax = nn.Softmax()
+
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top2 = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+
+    end = time.time()
+    bar = Bar('Processing', max=len(val_loader))
+
+    for batch_idx, (inputs, targets) in enumerate(val_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        if use_cuda:
+            inputs, targets = inputs.cuda(), targets.cuda()
+
+        # input data perturbation
+        if args.perturbation:
+            inputs = fgsm_attack(model, criterion, inputs, targets, args.eps).cuda()
+
+        # compute output
+        outputs, attention = model(inputs)
+        outputs = softmax(outputs)
+        loss = criterion(outputs, targets)
+        # attention, fe, per = attention
+
+        # measure accuracy and record loss
+        prec1, prec2 = accuracy(outputs.data, targets.data, topk=(1, 2))
+
+        losses.update(loss.data.item(), inputs.size(0))
+        top1.update(prec1.item(), inputs.size(0))
+        top2.update(prec2.item(), inputs.size(0))
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        # plot progress
+        bar.suffix = '({batch}/{size}) | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            batch=batch_idx + 1,
+            size=len(val_loader),
+            data=data_time.avg,
+            bt=batch_time.avg,
+            total=bar.elapsed_td,
+            eta=bar.eta_td,
+            loss=losses.avg,
+            top1=top1.avg,
+            top5=top2.avg,
+        )
+        n_iter = epoch * len(val_loader) + batch_idx + 1
+        writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
+        writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
+        writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
+        bar.next()
+
+        writer_test.add_scalar('Avg.loss', losses.avg, epoch)
+        writer_test.add_scalar('Avg.top1', top1.avg, epoch)
+        writer_test.add_scalar('Avg.top5', top2.avg, epoch)
         bar.finish()
     return (losses.avg, top1.avg)
 

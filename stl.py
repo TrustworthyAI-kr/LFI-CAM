@@ -12,7 +12,7 @@ import numpy as np
 import random
 import pickle
 import cv2
-
+from PIL import Image
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -29,6 +29,7 @@ from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig, config
 
 from tensorboardX import SummaryWriter
 from datetime import datetime
+
 # Models
 default_model_names = sorted(name for name in models.__dict__
                              if name.islower() and not name.startswith("__")
@@ -148,6 +149,14 @@ writer_test = SummaryWriter(
     log_dir=os.path.join(args.board_path, 'stl', common_path_name, board_time, "test"))
 
 
+def gaussian_blur(img):
+    image = np.array(img)
+    image_blur = cv2.GaussianBlur(image, (65, 65), 10)
+    new_image = image_blur
+    im = Image.fromarray(new_image)
+    return im
+
+
 def main():
     global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
@@ -169,6 +178,7 @@ def main():
     transform_test = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
+        # transforms.Lambda(gaussian_blur),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -232,12 +242,15 @@ def main():
 
     if args.evaluate:
         print('\nEvaluation only')
-        test_loss, test_acc = test(val_loader, model, criterion, args.epochs, use_cuda)
+        if args.perturbation:
+            test_loss, test_acc = test_perturbation(val_loader, model, criterion, args.epochs, use_cuda)
+        else:
+            test_loss, test_acc = test(val_loader, model, criterion, args.epochs, use_cuda)
 
         if not path.exists(path.join(args.checkpoint, 'output')):
             os.mkdir(path.join(args.checkpoint, 'output'))
         shutil.rmtree(os.path.join(args.checkpoint, 'output'))
-        shutil.copytree("output/", os.path.join(args.checkpoint, 'output'))
+        shutil.copytree("output/eval/", os.path.join(args.checkpoint, 'output'))
 
         print(' Test Loss:  %.8f, Test Acc:  %.2f' % (test_loss, test_acc))
         return
@@ -348,21 +361,6 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
     return (losses.avg, top1.avg)
 
 
-def fgsm_attack(model, loss, images, labels, eps=0.07):
-    images.requires_grad = True
-
-    outputs, _ = model(images)
-
-    model.zero_grad()
-    cost = loss(outputs, labels)
-    cost.backward()
-
-    attack_images = images + eps * images.grad.sign()
-    attack_images = torch.clamp(attack_images, 0, 1)
-
-    return attack_images
-
-
 def test(val_loader, model, criterion, epoch, use_cuda):
     global best_acc
     softmax = nn.Softmax()
@@ -375,11 +373,11 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
     # switch to evaluate mode
     model.eval()
-    with torch.no_grad():
+    with torch.gra.no_grad():
         end = time.time()
         bar = Bar('Processing', max=len(val_loader))
         count = 0
-        info_count = 0
+        # info_count = 0
 
         for batch_idx, (inputs, targets) in enumerate(val_loader):
             # measure data loading time
@@ -387,10 +385,6 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda()
-
-            # input data perturbation
-            if args.perturbation:
-                inputs = fgsm_attack(model, criterion, inputs, targets, args.eps).cuda()
 
             # compute output
             outputs, attention = model(inputs)
@@ -476,6 +470,90 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
             writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
             bar.next()
+
+        writer_test.add_scalar('Avg.loss', losses.avg, epoch)
+        writer_test.add_scalar('Avg.top1', top1.avg, epoch)
+        writer_test.add_scalar('Avg.top5', top2.avg, epoch)
+        bar.finish()
+    return (losses.avg, top1.avg)
+
+
+def fgsm_attack(model, loss, images, labels, eps=0.07):
+    images.requires_grad = True
+
+    outputs, _ = model(images)
+
+    model.zero_grad()
+    cost = loss(outputs, labels)
+    cost.backward()
+
+    attack_images = images + eps * images.grad.sign()
+    attack_images = torch.clamp(attack_images, 0, 1)
+
+    return attack_images
+
+
+def test_perturbation(val_loader, model, criterion, epoch, use_cuda):
+    global best_acc
+    softmax = nn.Softmax()
+
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top2 = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+
+    end = time.time()
+    bar = Bar('Processing', max=len(val_loader))
+
+    for batch_idx, (inputs, targets) in enumerate(val_loader):
+        # measure data loading time
+        data_time.update(time.time() - end)
+
+        if use_cuda:
+            inputs, targets = inputs.cuda(), targets.cuda()
+
+        # input data perturbation
+        if args.perturbation:
+            inputs = fgsm_attack(model, criterion, inputs, targets, args.eps).cuda()
+
+        # compute output
+        outputs, attention = model(inputs)
+        outputs = softmax(outputs)
+        loss = criterion(outputs, targets)
+        # attention, fe, per = attention
+
+        # measure accuracy and record loss
+        prec1, prec2 = accuracy(outputs.data, targets.data, topk=(1, 2))
+
+        losses.update(loss.data.item(), inputs.size(0))
+        top1.update(prec1.item(), inputs.size(0))
+        top2.update(prec2.item(), inputs.size(0))
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        # plot progress
+        bar.suffix = '({batch}/{size}) | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            batch=batch_idx + 1,
+            size=len(val_loader),
+            data=data_time.avg,
+            bt=batch_time.avg,
+            total=bar.elapsed_td,
+            eta=bar.eta_td,
+            loss=losses.avg,
+            top1=top1.avg,
+            top5=top2.avg,
+        )
+        n_iter = epoch * len(val_loader) + batch_idx + 1
+        writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
+        writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
+        writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
+        bar.next()
 
         writer_test.add_scalar('Avg.loss', losses.avg, epoch)
         writer_test.add_scalar('Avg.top1', top1.avg, epoch)
