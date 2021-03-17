@@ -353,7 +353,7 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
 def fgsm_attack(model, loss, images, labels, eps=0.07):
     images.requires_grad = True
 
-    outputs = model(images)
+    outputs, _ = model(images)
 
     model.zero_grad()
     cost = loss(outputs, labels)
