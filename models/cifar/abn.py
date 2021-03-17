@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 import math
 
-
 __all__ = ['resnet']
+
 
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
@@ -99,7 +99,7 @@ class ResNet(nn.Module):
         assert (depth - 2) % 6 == 0, 'depth should be 6n+2'
         n = (depth - 2) // 6
 
-        block = Bottleneck if depth >=44 else BasicBlock
+        block = Bottleneck if depth >= 44 else BasicBlock
 
         self.inplanes = 16
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1,
@@ -111,13 +111,13 @@ class ResNet(nn.Module):
 
         self.att_layer3 = self._make_layer(block, 64, n, stride=1, down_size=False)
         self.bn_att = nn.BatchNorm2d(64 * block.expansion)
-        self.att_conv   = nn.Conv2d(64 * block.expansion, num_classes, kernel_size=1, padding=0,
-                               bias=False)
+        self.att_conv = nn.Conv2d(64 * block.expansion, num_classes, kernel_size=1, padding=0,
+                                  bias=False)
         self.bn_att2 = nn.BatchNorm2d(num_classes)
-        self.att_conv2  = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
-                               bias=False)
-        self.att_conv3  = nn.Conv2d(num_classes, 1, kernel_size=3, padding=1,
-                               bias=False)
+        self.att_conv2 = nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0,
+                                   bias=False)
+        self.att_conv3 = nn.Conv2d(num_classes, 1, kernel_size=3, padding=1,
+                                   bias=False)
         self.bn_att3 = nn.BatchNorm2d(1)
         self.att_gap = nn.AvgPool2d(16)
         self.sigmoid = nn.Sigmoid()
@@ -165,11 +165,10 @@ class ResNet(nn.Module):
 
             return nn.Sequential(*layers)
 
-
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)    # 32x32
+        x = self.relu(x)  # 32x32
 
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16
@@ -190,7 +189,8 @@ class ResNet(nn.Module):
         rx = rx.view(rx.size(0), -1)
         rx = self.fc(rx)
 
-        return ax, rx, self.att
+        # return ax, rx, self.att
+        return rx, self.att
 
 
 def resnet(**kwargs):
