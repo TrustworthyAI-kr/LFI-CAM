@@ -121,29 +121,22 @@ best_acc = 0  # best test accuracy
 best_epoch = 0
 
 board_time = datetime.now().isoformat()
+common_path_name = os.path.join(args.board_tag, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}".format(args.arch,
+                                                                                         args.depth,
+                                                                                         args.train_batch,
+                                                                                         args.lr,
+                                                                                         args.weight_decay))
 writer_train = SummaryWriter(
-    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
-                                                                                                 args.depth,
-                                                                                                 args.train_batch,
-                                                                                                 args.lr,
-                                                                                                 args.weight_decay,
-                                                                                                 args.board_tag),
-                         board_time, "train"))
+    log_dir=os.path.join(args.board_path, os.path.basename(args.dataset), common_path_name, board_time, "train"))
 writer_test = SummaryWriter(
-    log_dir=os.path.join(args.board_path, args.dataset, "{}{:d}-bs{:d}-lr{:.5f}-wd{:.6f}-{}".format(args.arch,
-                                                                                                 args.depth,
-                                                                                                 args.train_batch,
-                                                                                                 args.lr,
-                                                                                                 args.weight_decay,
-                                                                                                 args.board_tag),
-                         board_time, "test"))
+    log_dir=os.path.join(args.board_path, os.path.basename(args.dataset), common_path_name, board_time, "test"))
 
 
 def main():
     global best_acc, best_epoch
     start_epoch = args.start_epoch  # start from epoch 0 or last checkpoint epoch
 
-    args.checkpoint = os.path.join(args.checkpoint, board_time)
+    args.checkpoint = os.path.join(args.checkpoint, os.path.basename(args.dataset), common_path_name, board_time)
     if not os.path.isdir(args.checkpoint):
         mkdir_p(args.checkpoint)
     config.save_config(args, os.path.join(args.checkpoint, "config.txt"))
