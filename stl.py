@@ -151,7 +151,7 @@ writer_test = SummaryWriter(
 
 def gaussian_blur(img):
     image = np.array(img)
-    image_blur = cv2.GaussianBlur(image, (65, 65), 10)
+    image_blur = cv2.GaussianBlur(image, (5, 5), 10)
     new_image = image_blur
     im = Image.fromarray(new_image)
     return im
@@ -178,7 +178,7 @@ def main():
     transform_test = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
-        # transforms.Lambda(gaussian_blur),
+        transforms.Lambda(gaussian_blur),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -250,7 +250,7 @@ def main():
         if not path.exists(path.join(args.checkpoint, 'output')):
             os.mkdir(path.join(args.checkpoint, 'output'))
         shutil.rmtree(os.path.join(args.checkpoint, 'output'))
-        shutil.copytree("output/eval/", os.path.join(args.checkpoint, 'output'))
+        shutil.copytree("output/", os.path.join(args.checkpoint, 'output'))
 
         print(' Test Loss:  %.8f, Test Acc:  %.2f' % (test_loss, test_acc))
         return
@@ -373,7 +373,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
     # switch to evaluate mode
     model.eval()
-    with torch.gra.no_grad():
+    with torch.no_grad():
         end = time.time()
         bar = Bar('Processing', max=len(val_loader))
         count = 0
@@ -387,16 +387,15 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 inputs, targets = inputs.cuda(), targets.cuda()
 
             # compute output
-            outputs, attention = model(inputs)
+            _, outputs, attention = model(inputs)
             outputs = softmax(outputs)
             loss = criterion(outputs, targets)
-            # attention, fe, per = attention
+            attention, fe, per = attention
 
             c_att = attention.data.cpu()
             c_att = c_att.numpy()
             d_inputs = inputs.data.cpu()
             d_inputs = d_inputs.numpy()
-
             in_b, in_c, in_y, in_x = inputs.shape
             for item_img, item_att in zip(d_inputs, c_att):
 
@@ -453,7 +452,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             end = time.time()
 
             # plot progress
-            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top2: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
                 batch=batch_idx + 1,
                 size=len(val_loader),
                 pt=args.perturbation,
