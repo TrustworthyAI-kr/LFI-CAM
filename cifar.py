@@ -79,6 +79,10 @@ parser.add_argument('--compressionRate', type=int, default=2, help='Compression 
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
+parser.add_argument('--perturbation', action='store_true', default=False,
+                    help='input data perturbation')
+parser.add_argument('--eps', default=0.007, type=float, help='perturbation eps')
+
 # Device options
 parser.add_argument('--gpu-id', default='0', type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
@@ -346,6 +350,21 @@ def train(trainloader, model, criterion, optimizer, epoch, use_cuda):
     return (losses.avg, top1.avg)
 
 
+def fgsm_attack(model, loss, images, labels, eps=0.07):
+    images.requires_grad = True
+
+    outputs = model(images)
+
+    model.zero_grad()
+    cost = loss(outputs, labels)
+    cost.backward()
+
+    attack_images = images + eps * images.grad.sign()
+    attack_images = torch.clamp(attack_images, 0, 1)
+
+    return attack_images
+
+
 def test(testloader, model, criterion, epoch, use_cuda):
     global best_acc
 
@@ -367,6 +386,10 @@ def test(testloader, model, criterion, epoch, use_cuda):
 
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda()
+
+            # input data perturbation
+            if args.perturbation:
+                images = fgsm_attack(model, loss, images, targets, args.eps).cuda()
 
             # compute output
             outputs, attention = model(inputs)
@@ -432,9 +455,10 @@ def test(testloader, model, criterion, epoch, use_cuda):
             end = time.time()
 
             # plot progress
-            bar.suffix = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
                 batch=batch_idx + 1,
                 size=len(testloader),
+                pt=args.perturbation,
                 data=data_time.avg,
                 bt=batch_time.avg,
                 total=bar.elapsed_td,

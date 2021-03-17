@@ -93,6 +93,9 @@ parser.add_argument('--widen-factor', type=int, default=4, help='Widen factor. 4
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
+parser.add_argument('--perturbation', action='store_true', default=False,
+                    help='input data perturbation')
+parser.add_argument('--eps', default=0.007, type=float, help='perturbation eps')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
 parser.add_argument('--enable_logging', action='store_true', default=False,
@@ -368,6 +371,21 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
     return (losses.avg, top1.avg)
 
 
+def fgsm_attack(model, loss, images, labels, eps=0.07):
+    images.requires_grad = True
+
+    outputs = model(images)
+
+    model.zero_grad()
+    cost = loss(outputs, labels)
+    cost.backward()
+
+    attack_images = images + eps * images.grad.sign()
+    attack_images = torch.clamp(attack_images, 0, 1)
+
+    return attack_images
+
+
 def test(val_loader, model, criterion, epoch, use_cuda):
     global best_acc
     softmax = nn.Softmax()
@@ -393,6 +411,10 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
             if use_cuda:
                 inputs, targets = inputs.cuda(), targets.cuda()
+
+            # input data perturbation
+            if args.perturbation:
+                images = fgsm_attack(model, loss, images, targets, args.eps).cuda()
 
             # compute output
             outputs, attention = model(inputs)
@@ -465,16 +487,17 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             end = time.time()
 
             # plot progress
-            bar.suffix = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top2: {top2: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top2: .4f}'.format(
                 batch=batch_idx + 1,
-                size=len(val_loader),
+                size=len(testloader),
+                pt=args.perturbation,
                 data=data_time.avg,
                 bt=batch_time.avg,
                 total=bar.elapsed_td,
                 eta=bar.eta_td,
                 loss=losses.avg,
                 top1=top1.avg,
-                top2=top2.avg,
+                top5=top2.avg,
             )
             if args.enable_logging:
                 n_iter = epoch * len(val_loader) + batch_idx + 1
