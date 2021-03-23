@@ -178,7 +178,7 @@ def main():
     transform_test = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
-        transforms.Lambda(gaussian_blur),
+        #transforms.Lambda(gaussian_blur),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -345,19 +345,20 @@ def train(train_loader, model, criterion, optimizer, epoch, use_cuda):
         n_iter = epoch * len(train_loader) + batch_idx + 1
         writer_train.add_scalar('Train/loss', loss.data.item(), n_iter)
         writer_train.add_scalar('Train/top1', prec1.data.item(), n_iter)
-        writer_train.add_scalar('Train/top5', prec2.data.item(), n_iter)
+        writer_train.add_scalar('Train/top2', prec2.data.item(), n_iter)
 
         bar.next()
 
     writer_train.add_scalar('Avg.loss', losses.avg, epoch)
     writer_train.add_scalar('Avg.top1', top1.avg, epoch)
-    writer_train.add_scalar('Avg.top5', top2.avg, epoch)
+    writer_train.add_scalar('Avg.top2', top2.avg, epoch)
 
     # for name, param in model.named_parameters():
     #     layer, attr = os.path.splitext(name)
     #     attr = attr[1:]
     #     writer_train.add_histogram("{}/{}".format(layer, attr), param, epoch)
 
+    bar.finish()
     return (losses.avg, top1.avg)
 
 
@@ -452,7 +453,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             end = time.time()
 
             # plot progress
-            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Prb mode {pt:d} | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top2: {top2: .4f}'.format(
                 batch=batch_idx + 1,
                 size=len(val_loader),
                 pt=args.perturbation,
@@ -462,17 +463,17 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 eta=bar.eta_td,
                 loss=losses.avg,
                 top1=top1.avg,
-                top5=top2.avg,
+                top2=top2.avg,
             )
             n_iter = epoch * len(val_loader) + batch_idx + 1
             writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
             writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
-            writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
+            writer_test.add_scalar('Test/top2', prec2.data.item(), n_iter)
             bar.next()
 
         writer_test.add_scalar('Avg.loss', losses.avg, epoch)
         writer_test.add_scalar('Avg.top1', top1.avg, epoch)
-        writer_test.add_scalar('Avg.top5', top2.avg, epoch)
+        writer_test.add_scalar('Avg.top2', top2.avg, epoch)
         bar.finish()
     return (losses.avg, top1.avg)
 
@@ -537,7 +538,7 @@ def test_perturbation(val_loader, model, criterion, epoch, use_cuda):
         end = time.time()
 
         # plot progress
-        bar.suffix = '({batch}/{size}) | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+        bar.suffix = '({batch}/{size}) | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top2: {top2: .4f}'.format(
             batch=batch_idx + 1,
             size=len(val_loader),
             data=data_time.avg,
@@ -546,17 +547,17 @@ def test_perturbation(val_loader, model, criterion, epoch, use_cuda):
             eta=bar.eta_td,
             loss=losses.avg,
             top1=top1.avg,
-            top5=top2.avg,
+            top2=top2.avg,
         )
         n_iter = epoch * len(val_loader) + batch_idx + 1
         writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
         writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
-        writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
+        writer_test.add_scalar('Test/top2', prec2.data.item(), n_iter)
         bar.next()
 
         writer_test.add_scalar('Avg.loss', losses.avg, epoch)
         writer_test.add_scalar('Avg.top1', top1.avg, epoch)
-        writer_test.add_scalar('Avg.top5', top2.avg, epoch)
+        writer_test.add_scalar('Avg.top2', top2.avg, epoch)
         bar.finish()
     return (losses.avg, top1.avg)
 
