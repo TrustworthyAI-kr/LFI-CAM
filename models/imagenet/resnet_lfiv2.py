@@ -109,23 +109,19 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0], down_size=True)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, down_size=True)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, down_size=True)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, down_size=True)
 
-        self.block1 = self._make_layer(block, 256, layers[3], down_size=True)
-        self.block2 = self._make_layer(block, 512, layers[3], down_size=True)
-        self.block3 = self._make_layer(block, 256, layers[3], down_size=True)
-
-        self.att_conv1 = nn.Conv2d(256 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_conv1 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
         self.att_bn1 = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv2 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
-        self.att_bn2 = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv3 = nn.Conv2d(512 * block.expansion, 256* block.expansion, kernel_size=1, padding=0, bias=False)
-        self.att_bn3 = nn.BatchNorm2d(256 * block.expansion)
-        self.att_conv4 = nn.Conv2d(256 * block.expansion, 256 * block.expansion, kernel_size=1, padding=0, bias=False)
-        self.att_bn4 = nn.BatchNorm2d(256 * block.expansion)
+        self.att_conv2 = nn.Conv2d(512 * block.expansion, 256 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn2 = nn.BatchNorm2d(256 * block.expansion)
+        self.att_conv3 = nn.Conv2d(256 * block.expansion, 512* block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn3 = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv4 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_bn4 = nn.BatchNorm2d(512 * block.expansion)
 
-        self.avgpool = nn.AvgPool2d(14, stride=1)
-        self.fc = nn.Linear(256 * block.expansion, num_classes)
-        #self.fc = nn.Sequential(nn.Dropout(p= self.dropout), nn.Linear(256 * block.expansion, num_classes))
+        self.avgpool = nn.AvgPool2d(7, stride=1)
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -172,29 +168,29 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-
-        # block 1, 2, 3
-        ax = self.block1(x)
-        ax = self.block2(ax)
-        ax = self.block3(ax)
+        ax = self.layer4(x)
         ex = ax
 
-        # resize input to (32, 1, 14, 14)
+        # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
-        input_resized = F.interpolate(input_gray, (14, 14), mode='bilinear')
+        input_resized = F.interpolate(input_gray, (7, 7), mode='bilinear')
 
-        # feature * image (before attention cal.)
+        # fe normalization & feature * image (before attention cal.)
         fe = ax.clone()
+        org = fe.clone()
         a1, a2, a3, a4= fe.size()
         fe = fe.view(a1, a2, -1)
 
         fe -= fe.min(2, keepdim=True)[0]
-        fe /= fe.max(2, keepdim=True)[0]+0.00001
+        fe /= fe.max(2, keepdim=True)[0]
         fe = fe.view(a1, a2, a3,a4)
+
+        fe[torch.isnan(fe)] = 1
+        fe[(org ==0)] = 0
 
         new_fe = fe * input_resized
 
-        # feature importance extractor
+        # FIN
         ax = self.att_conv1(new_fe)
         ax = self.att_bn1(ax)
         ax = self.att_conv2(ax)
@@ -207,7 +203,7 @@ class ResNet(nn.Module):
         ax = self.relu(ax)
 
         ax = self.avgpool(ax)
-        w = (ax.view(ax.size(0), -1))
+        w = F.softmax(ax.view(ax.size(0), -1))
 
         b, c, u, v = fe.size()
         score_saliency_map = torch.zeros((b, 1, u, v)).cuda()
@@ -218,10 +214,16 @@ class ResNet(nn.Module):
             score_saliency_map += score * saliency_map
 
         score_saliency_map = F.relu(score_saliency_map)
-        score_saliency_map_min, score_saliency_map_max = score_saliency_map.min(), score_saliency_map.max()
 
-        if score_saliency_map_min != score_saliency_map_max:
-            score_saliency_map = (score_saliency_map - score_saliency_map_min).div(score_saliency_map_max - score_saliency_map_min).data
+        org = score_saliency_map.clone()
+        a1, a2, a3, a4= score_saliency_map.size()
+        score_saliency_map = score_saliency_map.view(a1, a2, -1)
+
+        score_saliency_map -= score_saliency_map.min(2, keepdim=True)[0]
+        score_saliency_map /= score_saliency_map.max(2, keepdim=True)[0]
+        score_saliency_map = score_saliency_map.view(a1, a2, a3,a4)
+
+        score_saliency_map[torch.isnan(score_saliency_map)] = org[torch.isnan(score_saliency_map)]
 
         att = score_saliency_map
 
