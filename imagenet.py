@@ -473,7 +473,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                     jet_map = cv2.applyColorMap(vis_map, cv2.COLORMAP_JET)
 
                     # create blended img (original + heatmap)
-                    blend = org * 0.6 + jet_map * 0.4
+                    blend = org * 0.5 + jet_map * 0.5
 
                     out_path = path.join(out_dir, 'concat', '{0:06d}_concat.png'.format(count))
                     c1 = np.concatenate((v_img, blend), axis=1)
@@ -500,7 +500,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
             end = time.time()
 
             # plot progress
-            bar.suffix = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            bar.suffix = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top2: {top: .4f}'.format(
                 batch=batch_idx + 1,
                 size=len(val_loader),
                 data=data_time.avg,
@@ -509,7 +509,7 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 eta=bar.eta_td,
                 loss=losses.avg,
                 top1=top1.avg,
-                top5=top2.avg,
+                top2=top2.avg,
             )
             if args.enable_logging:
                 n_iter = epoch * len(val_loader) + batch_idx + 1
@@ -587,7 +587,7 @@ def test_perturbation(val_loader, model, criterion, epoch, use_cuda):
         end = time.time()
 
         # plot progress
-        bar.suffix = '({batch}/{size}) | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+        bar.suffix = '({batch}/{size}) | Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top2: {top2: .4f}'.format(
             batch=batch_idx + 1,
             size=len(val_loader),
             data=data_time.avg,
@@ -596,17 +596,17 @@ def test_perturbation(val_loader, model, criterion, epoch, use_cuda):
             eta=bar.eta_td,
             loss=losses.avg,
             top1=top1.avg,
-            top5=top2.avg,
+            top2=top2.avg,
         )
         n_iter = epoch * len(val_loader) + batch_idx + 1
         writer_test.add_scalar('Test/loss', loss.data.item(), n_iter)
         writer_test.add_scalar('Test/top1', prec1.data.item(), n_iter)
-        writer_test.add_scalar('Test/top5', prec2.data.item(), n_iter)
+        writer_test.add_scalar('Test/top2', prec2.data.item(), n_iter)
         bar.next()
 
         writer_test.add_scalar('Avg.loss', losses.avg, epoch)
         writer_test.add_scalar('Avg.top1', top1.avg, epoch)
-        writer_test.add_scalar('Avg.top5', top2.avg, epoch)
+        writer_test.add_scalar('Avg.top2', top2.avg, epoch)
         bar.finish()
     return (losses.avg, top1.avg)
 
