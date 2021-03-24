@@ -49,6 +49,7 @@ model_names = customized_models_names
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
 # Datasets
+parser.add_argument('--dataset', default='path to dataset', type=str)
 parser.add_argument('-d', '--data', default='path to dataset', type=str)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
@@ -388,10 +389,10 @@ def test(val_loader, model, criterion, epoch, use_cuda):
                 inputs, targets = inputs.cuda(), targets.cuda()
 
             # compute output
-            _, outputs, attention = model(inputs)
+            outputs, attention = model(inputs)
             outputs = softmax(outputs)
             loss = criterion(outputs, targets)
-            attention, fe, per = attention
+            #attention, fe, per = attention
 
             c_att = attention.data.cpu()
             c_att = c_att.numpy()
