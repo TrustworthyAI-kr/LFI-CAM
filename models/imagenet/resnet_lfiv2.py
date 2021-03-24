@@ -111,13 +111,13 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, down_size=True)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, down_size=True)
 
-        self.att_conv1 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_conv1 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn1 = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv2 = nn.Conv2d(512 * block.expansion, 256 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_conv2 = nn.Conv2d(512 * block.expansion, 256 * block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn2 = nn.BatchNorm2d(256 * block.expansion)
-        self.att_conv3 = nn.Conv2d(256 * block.expansion, 512* block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_conv3 = nn.Conv2d(256 * block.expansion, 512* block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn3 = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv4 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=1, padding=0, bias=False)
+        self.att_conv4 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn4 = nn.BatchNorm2d(512 * block.expansion)
 
         self.avgpool = nn.AvgPool2d(7, stride=1)
