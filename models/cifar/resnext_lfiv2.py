@@ -149,7 +149,7 @@ class CifarResNeXt(nn.Module):
 
         # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
-        input_resized = F.interpolate(input_gray, (16, 16), mode='bilinear')
+        input_resized = F.interpolate(input_gray, (8, 8), mode='bilinear')
 
         # fe normalization & feature * image (before attention cal.)
         fe = ax.clone()
