@@ -113,9 +113,9 @@ class ResNet(nn.Module):
 
         self.att_conv1 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn1 = nn.BatchNorm2d(512 * block.expansion)
-        self.att_conv2 = nn.Conv2d(512 * block.expansion, 256 * block.expansion, kernel_size=3, padding=1, bias=False)
-        self.att_bn2 = nn.BatchNorm2d(256 * block.expansion)
-        self.att_conv3 = nn.Conv2d(256 * block.expansion, 512* block.expansion, kernel_size=3, padding=1, bias=False)
+        self.att_conv2 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=3, padding=1, bias=False)
+        self.att_bn2 = nn.BatchNorm2d(512 * block.expansion)
+        self.att_conv3 = nn.Conv2d(512 * block.expansion, 512* block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn3 = nn.BatchNorm2d(512 * block.expansion)
         self.att_conv4 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn4 = nn.BatchNorm2d(512 * block.expansion)
