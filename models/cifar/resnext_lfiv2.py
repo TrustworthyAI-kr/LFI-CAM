@@ -86,14 +86,14 @@ class CifarResNeXt(nn.Module):
         self.classifier = nn.Linear(1024, num_classes)
 
         self.attention = nn.Sequential(
-            nn.Conv2d(self.stages[3], self.stages[3], kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(self.stages[3], self.stages[3], kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.stages[3]),
-            nn.Conv2d(self.stages[3], self.stages[2], kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(self.stages[3], self.stages[2], kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.stages[2]),
             nn.ReLU(inplace=True),
-            nn.Conv2d(self.stages[2], self.stages[3], kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(self.stages[2], self.stages[3], kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.stages[3]),
-            nn.Conv2d(self.stages[3], self.stages[3], kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(self.stages[3], self.stages[3], kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.stages[3]),
             nn.ReLU(inplace=True),
             nn.AvgPool2d(8)

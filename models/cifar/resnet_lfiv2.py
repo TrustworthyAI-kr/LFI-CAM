@@ -109,14 +109,14 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 64, n, stride=2, down_size=True)
 
         self.attention = nn.Sequential(
-            nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64 * block.expansion),
-            nn.Conv2d(64 * block.expansion, 32 * block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(64 * block.expansion, 32 * block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(32 * block.expansion),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32 * block.expansion, 64* block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(32 * block.expansion, 64* block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64 * block.expansion),
-            nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64 * block.expansion),
             nn.ReLU(inplace=True),
             nn.AvgPool2d(8)
