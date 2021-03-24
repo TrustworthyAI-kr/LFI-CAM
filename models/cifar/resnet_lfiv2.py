@@ -111,10 +111,10 @@ class ResNet(nn.Module):
         self.attention = nn.Sequential(
             nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64 * block.expansion),
-            nn.Conv2d(64 * block.expansion, 32 * block.expansion, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(32 * block.expansion),
+            nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(64 * block.expansion),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32 * block.expansion, 64* block.expansion, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(64 * block.expansion, 64* block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64 * block.expansion),
             nn.Conv2d(64 * block.expansion, 64 * block.expansion, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64 * block.expansion),

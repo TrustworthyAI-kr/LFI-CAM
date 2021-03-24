@@ -100,10 +100,10 @@ class DenseNet(nn.Module):
         self.attention = nn.Sequential(
             nn.Conv2d(self.inplanes, self.inplanes, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.inplanes),
-            nn.Conv2d(self.inplanes, (int) (self.inplanes/3), kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d((int)(self.inplanes/3)),
+            nn.Conv2d(self.inplanes, self.inplanes, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(self.inplanes),
             nn.ReLU(inplace=True),
-            nn.Conv2d((int)(self.inplanes/3), self.inplanes, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(self.inplanes, self.inplanes, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.inplanes),
             nn.Conv2d(self.inplanes, self.inplanes, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(self.inplanes),
