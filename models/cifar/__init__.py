@@ -63,7 +63,7 @@ Densenet-161             22.35           6.20
 
 # from .alexnet import *
 # from .vgg import *
-from .resnet import *
+from .resnet_lfiv2 import *
 from .resnext import *
 from .wrn import *
 # from .preresnet import *

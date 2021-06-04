@@ -101,7 +101,7 @@ class ResNet(nn.Module):
         self.dropout = dropout
 
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -120,7 +120,7 @@ class ResNet(nn.Module):
         self.att_conv4 = nn.Conv2d(512 * block.expansion, 512 * block.expansion, kernel_size=3, padding=1, bias=False)
         self.att_bn4 = nn.BatchNorm2d(512 * block.expansion)
 
-        self.avgpool = nn.AvgPool2d(7, stride=1)
+        self.avgpool = nn.AvgPool2d(14, stride=1)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -173,7 +173,7 @@ class ResNet(nn.Module):
 
         # resize input
         input_gray = torch.mean(input, dim=1, keepdim=True)
-        input_resized = F.interpolate(input_gray, (7, 7), mode='bilinear')
+        input_resized = F.interpolate(input_gray, (14, 14), mode='bilinear')
 
         # fe normalization & feature * image (before attention cal.)
         fe = ax.clone()
@@ -193,11 +193,13 @@ class ResNet(nn.Module):
         # FIN
         ax = self.att_conv1(new_fe)
         ax = self.att_bn1(ax)
+	ax = self.relu(ax)
         ax = self.att_conv2(ax)
         ax = self.att_bn2(ax)
         ax = self.relu(ax)
         ax = self.att_conv3(ax)
         ax = self.att_bn3(ax)
+	ax = self.relu(ax)
         ax = self.att_conv4(ax)
         ax = self.att_bn4(ax)
         ax = self.relu(ax)
