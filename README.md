@@ -9,7 +9,8 @@ This repository contains source code for the **LFI-CAM(Learning of Feature Impor
 Class Activation Mapping (CAM) is a powerful technique used to understand the decision making of Convolutional Neural Network (CNN) in computer vision. Recently, there have been attempts not only to generate better visual explanations, but also to improve classification performance using visual explanations. However, the previous works still have their own drawbacks. In this paper, we propose a novel architecture, LFI-CAM, which is trainable for image classification and visual explanation in an end-to-end manner. LFI-CAM generates an attention map for visual explanation during forward propagation, at the same time, leverages the attention map to improve the classification performance through the attention mechanism. Our Feature Importance Network (FIN) focuses on learning the feature importance instead of directly learning the attention map to obtain a more reliable and consistent attention map. We confirmed that LFI-CAM model is optimized not only by learning the feature importance but also by enhancing the backbone feature representation to focus more on important features of the input image. Experimental results show that LFI-CAM outperforms the baseline models’s accuracy on the classification tasks as well as significantly improves on the previous works in terms of attention map quality and stability over different hyper-parameters.
 </p>
 
-***Authors: Kwang Hee Lee<sup>1,\*,\*\*</sup>, Chaewon Park<sup>1,\*</sup>, Junghyun Oh<sup>1,2,*</sup>, and Nojun Kwak<sup>2</sup>***
+
+***Authors: [Kwang Hee Lee](https://github.com/kh22l22)<sup>1,\*,\*\*</sup>, [Chaewon Park](https://github.com/emilypark0418)<sup>1,\*</sup>, [Junghyun Oh](https://github.com/jhvics1)<sup>1,2,*</sup>, and Nojun Kwak<sup>2</sup>***
 
 > <sup>1</sup> Boeing Korea Engineering and Technology Center(BKETC), <sup>2</sup> Seoul National University 
 
@@ -70,13 +71,13 @@ Requirements of PyTorch version are as follows:
 
 ## Attention Map Example and Stability Analysis
 ![overview image](./asset/Stability_Test.png)
-- (a): ABN result on STL10
-- (b): LFI-CAM result on STL10
-- (c): ABN result on CatDog
-- (d): LFI-CAM result on CatDog
+
+> Examples of stability test on visual explanation. Each row displays CAM results of ABN or LFI-CAM models that were trained with various (5) hyper-parameters. As illustrated, ABN’s CAM results are unreliable and inconsistent even for same test images despite the similar accuracies of the models. On the other
+hand, LFI-CAM results in much more consistent CAM images with better visual quality. (a)(c) ABN on STL10 (a) and Cat&Dog (c), (b)(d) LFI-CAM on STL10 (b) and Cat&Dog (d). 
 
 ![overview image](./asset/IOU_Test.png)
 
+> Stability evaluation of visual explanation. (a) IoU between models per dataset, (b) Average IoU per dataset.
 
 ## IoU Calculation
 1. Assuming you have trained two models to compare, create attention npy files
