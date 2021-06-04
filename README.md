@@ -1,4 +1,4 @@
-# LFI-CAM
+# LFI-CAM: Learning Feature Importance for Better Visual Explanation
 
 ## Abstract 
 
