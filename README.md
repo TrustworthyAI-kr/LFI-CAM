@@ -4,7 +4,7 @@
 
 This repository contains the source code for LFI-CAM paper.
 
-[arXiv paper]
+[arXiv paper] : https://arxiv.org/pdf/2105.00937.pdf 
 
 # Quick Guides
 - Using Tensorboard
@@ -59,8 +59,12 @@ Requirements of PyTorch version are as follows:
 - PyTorch : 0.4.0
 - PyTorch vision : 0.2.1
 
-### Examples of attention map
+### Attention Map Example and Stability Analysis
 ![overview image](./asset/Stability_Test.png)
+- (a): ABN result on STL10
+- (b): LFI-CAM result on STL10
+- (c): ABN result on CatDog
+- (d): LFI-CAM result on CatDog
 
 ![overview image](./asset/IOU_Test.png)
 
