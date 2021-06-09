@@ -1,4 +1,4 @@
-# LFI-CAM: Learning Feature Importance for Better Visual Explanation
+# LFI-CAM: Learning Feature Importance for Better Visual Explanation-Official Pytorch Implementation
 
 ## Abstract 
 
